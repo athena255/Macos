@@ -248,6 +248,28 @@ void MachFile::parseSymbolTable(uintptr_t tableStart, uint32_t count)
   }
 }
 
+void MachFile::parseIndirTable(uintptr_t tableStart, uint32_t count)
+{
+  nlist_64* symEntry;
+  for (int i = 0; i < count; ++i)
+  {
+    symEntry = reinterpret_cast<nlist_64*>(tableStart+ i*sizeof(nlist_64));
+    std::string stype = toStringN(N_TYPE & symEntry->n_type);
+    if (N_STAB & symEntry->n_type)
+      std::cout << "\t\tN_STAB entry (debug): " << toStringSTAB(symEntry->n_type);
+    else if (N_PEXT & symEntry->n_type)
+      std::cout << "\t\tN_PEXT (private extern) " << stype;
+    else if (N_EXT & symEntry->n_type)
+      std::cout << "\t\t N_EXT (external symbol) "<< stype;
+    else
+      std::cout << "\t\t" << stype;
+
+    std::cout << " section number: " << std::dec << (uint16_t) symEntry->n_sect;
+    parseTwoLevel(symEntry->n_desc);
+    std::cout << " value:"  << reinterpret_cast<char*>(&symEntry->n_value)<< std::endl;
+  }
+}
+
 void MachFile::parseTwoLevel(uint16_t n_desc)
 {
   if (symbolsInfo.isTwoLevel)
@@ -298,7 +320,7 @@ void MachFile::loadDysymtabCommand()
   std::cout << RED"\tindirect symbol table at offset: " RESET << "0x" << std::hex << dc->indirectsymoff;
   std::cout << std::dec << MAGENTA" (count: " RESET << dc->nindirectsyms << ")"<< std::endl;
   symbolsInfo.indirSymTable = reinterpret_cast<uintptr_t>(machfile + dc->indirectsymoff);
-  parseSymbolTable((symbolsInfo.indirSymTable) , dc->nindirectsyms);
+  parseIndirTable((symbolsInfo.indirSymTable) , dc->nindirectsyms);
 
   // External relocation entries
   std::cout << RED"\texternal relocation entries at offset: " RESET << "0x" << std::hex << dc->extreloff; 

@@ -90,6 +90,7 @@ void parseTwoLevel(uint16_t n_desc);
 void parseSection(section_64* sec64);
 void parseSegment(segment_command_64* seg64);
 void parseDysymTable(uintptr_t);
+void parseIndirTable(uintptr_t tableStart, uint32_t count);
 
 GenInfo genInfo;
 BasicInfo basicInfo;
