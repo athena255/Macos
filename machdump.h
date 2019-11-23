@@ -38,7 +38,25 @@ struct DirectoryInfo {
   uintptr_t debug;
 };
 
+struct LoaderInfo {
+  uintptr_t nlSymbolPtr; // pointer to section64 describing __nl_symbol_ptr
+  uintptr_t laSymbolPtr; 
+  uintptr_t textPtr; // pointer to section64 describing __text
+  uintptr_t dataPtr; 
+  uintptr_t linkedItSegPtr; // pointer to __LINKEDIT
+};
+
+struct SymbolsInfo {
+  uint8_t isTwoLevel; // MH_TWOLEVEL flag of mach_header is set
+  uintptr_t symTablePtr; // location of symtable in file
+  size_t numIndirEntries; 
+  uintptr_t indirSymTable; // location of indirect symbol table in file
+};
+
+#define MAX_FILE_SIZE 0x20000
+
 class MachFile{
+
 public:
 MachFile(const char* fileName);
 ~MachFile();
@@ -65,16 +83,24 @@ void loadLinkeditDataCommand();
 void parseToC(uint32_t offset, uint32_t count);
 void parseModuleTable(uint32_t offset, uint32_t count);
 void parseRefTable(uint32_t offset, uint32_t count);
-void parseSymbolTable(uint32_t, uint32_t);
+void parseSymbolTable(uintptr_t tableStart, uint32_t count);
+void parseTwoLevel(uint16_t n_desc);
+
+// symbol tables handling
+void parseSection(section_64* sec64);
+void parseSegment(segment_command_64* seg64);
+void parseDysymTable(uintptr_t);
 
 GenInfo genInfo;
 BasicInfo basicInfo;
 DirectoryInfo dirInfo;
+LoaderInfo loaderInfo;
+SymbolsInfo symbolsInfo;
 
 const char* fileName;
 mach_header_64* pMachHeader;
 load_command** pLoadCommands;
-char temp[10000];
+char machfile[MAX_FILE_SIZE];
 size_t ptr;
 
 };

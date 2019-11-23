@@ -490,6 +490,7 @@ std::string toStringMAX(uint64_t s){
     }
 }
 
+// Referenced type mask on n_desc value in symbol table entry
 std::string toStringREFERENCE(uint64_t s){
     switch(s){
     case REFERENCE_FLAG_PRIVATE_DEFINED:
@@ -511,35 +512,26 @@ std::string toStringREFERENCE(uint64_t s){
     }
 }
 
-std::string toStringREFERENCED(uint64_t s){
+// Additionally bits that can be set for symbol table entry n_desc
+std::string toStringAdditionNDesc(uint64_t s){
     switch(s){
     case REFERENCED_DYNAMICALLY:
           return " REFERENCED_DYNAMICALLY ";
+    case N_WEAK_REF:
+          return " N_WEAK_REF ";
+    case N_WEAK_DEF:
+          return " N_WEAK_DEF ";
     default:
         return "UNKNOWN";
     }
 }
 
-std::string toStringSELF(uint64_t s){
+std::string toStringOrdinal(uint64_t s){
     switch(s){
     case SELF_LIBRARY_ORDINAL:
           return " SELF_LIBRARY_ORDINAL ";
-    default:
-        return "UNKNOWN";
-    }
-}
-
-std::string toStringDYNAMIC(uint64_t s){
-    switch(s){
     case DYNAMIC_LOOKUP_ORDINAL:
           return " DYNAMIC_LOOKUP_ORDINAL ";
-    default:
-        return "UNKNOWN";
-    }
-}
-
-std::string toStringEXECUTABLE(uint64_t s){
-    switch(s){
     case EXECUTABLE_ORDINAL:
           return " EXECUTABLE_ORDINAL ";
     default:
@@ -547,26 +539,12 @@ std::string toStringEXECUTABLE(uint64_t s){
     }
 }
 
-std::string toStringNO(uint64_t s){
-    switch(s){
-    case NO_SECT:
-          return " NO_SECT ";
-    default:
-        return "UNKNOWN";
-    }
-}
-
-// stab.h ==================================================================
 std::string toStringN(uint64_t s){
     switch(s){
     case N_INDR:
           return " N_INDR ";
     case N_UNDF:
           return " N_UNDF ";
-    case N_WEAK_REF:
-          return " N_WEAK_REF ";
-    case N_WEAK_DEF:
-          return " N_WEAK_DEF ";
     case N_ALT_ENTRY:
           return " N_ALT_ENTRY ";
     case N_SYMBOL_RESOLVER:
@@ -597,6 +575,8 @@ std::string toStringN(uint64_t s){
           return " N_EXCL ";
     case N_BNSYM:
           return " N_BNSYM ";
+    case N_RSYM:
+          return " N_RSYM ";
     case N_SO:
           return " N_SO ";
     case N_OSO:
@@ -609,6 +589,8 @@ std::string toStringN(uint64_t s){
           return " N_AST ";
     case N_OPT:
           return " N_OPT ";
+    case N_LSYM:
+          return " N_LSYM ";
     case N_BINCL:
           return " N_BINCL ";
     case N_PARAMS:

@@ -13,10 +13,39 @@ void handleError(bool err)
   exit(EXIT_FAILURE);
 }
 
+void MachFile::parseSection(section_64* sec64)
+{
+  if ( !strncmp(sec64->sectname, "__text", 6))
+  {
+    loaderInfo.textPtr = reinterpret_cast<uintptr_t>(sec64);
+  }
+  else if ( !strncmp(sec64->sectname, "__nl_symbol_ptr", 15))
+  {
+    loaderInfo.nlSymbolPtr = reinterpret_cast<uintptr_t>(sec64);
+  }
+  else if ( !strncmp(sec64->sectname, "__la_symbol_ptr", 15)) // pointer to imported functions
+  {
+    loaderInfo.laSymbolPtr = reinterpret_cast<uintptr_t>(sec64);
+  }
+  else if ( !strncmp(sec64->sectname, "__data", 6))
+  {
+    loaderInfo.dataPtr = reinterpret_cast<uintptr_t>(sec64);
+  }
+}
+
+void MachFile::parseSegment(segment_command_64* seg64)
+{
+  if ( !strncmp(seg64->segname, "__LINKEDIT", 10))
+  {
+    loaderInfo.linkedItSegPtr = reinterpret_cast<uintptr_t>(seg64);
+  }
+}
+
 void MachFile::loadSegmentCommand64()
 {
-  segment_command_64* seg64 = reinterpret_cast<segment_command_64*>(temp + ptr);
-
+  segment_command_64* seg64 = reinterpret_cast<segment_command_64*>(machfile + ptr);
+  parseSegment(seg64);
+  #ifdef VERBOSE
   std::cout << "Segment: " << seg64->segname << std::endl;
   std::cout << MAGENTA"\tnum sections: " << seg64->nsects << std::endl;
   std::cout << BLUE"\tVM address: " RESET << "0x"  << std::hex << seg64->vmaddr << std::endl;
@@ -24,28 +53,35 @@ void MachFile::loadSegmentCommand64()
   std::cout << RED"\tFile Offset: " RESET << "0x"  << seg64->fileoff << std::endl;
   std::cout << GREEN"\tFile size: " RESET << "0x"  << seg64->filesize << std::endl;
   std::cout << "\tFlags: " RESET << "0x"  << std::hex << seg64->flags << std::endl;
+  #endif
   
   if (seg64->nsects == 0 ) return;
 
   // enumerate sections
   for(size_t i = 0; i < seg64->nsects; ++i){
-    section_64* sec64 = reinterpret_cast<section_64*>(temp + ptr + sizeof(segment_command_64) + i*sizeof(section_64));
-    
+    section_64* sec64 = reinterpret_cast<section_64*>(machfile + ptr + sizeof(segment_command_64) + i*sizeof(section_64));
+    parseSection(sec64);
+    #ifdef VERBOSE
     std::cout << "\tSection: " << sec64->sectname << std::endl;
     std::cout << BLUE"\t\tVM address: " RESET << "0x"  << sec64->addr << std::endl;
     std::cout << GREEN"\t\tVM section size: " RESET << "0x"  << sec64->size << std::endl;
     std::cout << RED"\t\tFile Offset: " RESET << "0x"  << sec64->offset << std::endl;
     std::cout << "\t\tSection Alignment: " RESET << "0x"  << (1 << sec64->align) << std::endl;
     std::cout << RED"\t\tFile Offset Relocation Entries: " RESET << "0x"  << sec64->reloff << std::endl;
-    std::cout << MAGENTA"\t\tNumber of Relocation Entries: " << std::dec << sec64->nreloc << std::endl;
+    std::cout << MAGENTA"\t\tNumber of Relocation Entries: " RESET << std::dec << sec64->nreloc << std::endl;
     std::cout << "\t\tFlags: " RESET << "0x"  << std::hex << sec64->flags << std::endl;
+    std::cout << RED "\t\tReserved 1 (offset or index): " RESET << "0x" << std::hex << sec64->reserved1 << std::endl;
+    std::cout << MAGENTA "\t\tReserved 2 (count or sizeof): " RESET << "0x" << std::hex << sec64->reserved2 << std::endl;
+    std::cout << "\t\tReserved 3 (reserved): " RESET << "0x" << std::hex << sec64->reserved3 << std::endl;
+    #endif
   }
   // do something
 }
 
 void MachFile::loadDyldInfoCommand()
 {
-  dyld_info_command* dic = reinterpret_cast<dyld_info_command*>(temp + ptr);
+  dyld_info_command* dic = reinterpret_cast<dyld_info_command*>(machfile + ptr);
+  #ifdef VERBOSE
   std::cout << RED"\trebase info at offset: " RESET << "0x"  << std::hex << 
     dic->rebase_off << GREEN" size "  RESET << "(0x"  << dic->rebase_size << ")" << std::endl ;
 
@@ -61,42 +97,53 @@ void MachFile::loadDyldInfoCommand()
 
   std::cout << RED"\texport info at offset: " RESET << "0x" 
     << dic->export_off << GREEN" size "  RESET << "(0x"  << dic->export_size << ")" << std::endl ;
+  #endif
 }
 
 void MachFile::loadSymtabCommand()
 {
-  symtab_command* sc = reinterpret_cast<symtab_command*>(temp + ptr);
-  std::cout << RED"\tSymbol table at offset: " RESET << "0x"  
-    << std::hex << sc->symoff << MAGENTA" count "  RESET << "(0x"  << sc->nsyms << ")" << std::endl;
-  // parseSymbolTable(sc->symoff, sc->nsyms);
+
+  symtab_command* sc = reinterpret_cast<symtab_command*>(machfile + ptr);
+  symbolsInfo.symTablePtr = reinterpret_cast<uintptr_t>((reinterpret_cast<uintptr_t>(machfile) + sc->symoff));
+
+  std::cout << RED"\tSymbol table starts at offset: " RESET << "0x"  
+    << std::hex << sc->symoff;
+  std::cout << MAGENTA" count "  RESET << "(0x"  << sc->nsyms << ")" << std::endl;
+
+  parseSymbolTable(symbolsInfo.symTablePtr, sc->nsyms);
   std::cout << RED"\tStrings table at offset: " RESET << "0x"  
     << std::hex << sc->stroff << GREEN" size "  RESET << "(0x"  << sc->strsize << ")" << std::endl;
+
 }
 
 void MachFile::loadDylinkerCommand()
 {
-  dylinker_command* dc = reinterpret_cast<dylinker_command*>(temp + ptr);
-  char* nameAddr = temp + ptr + dc->name.offset;
+  dylinker_command* dc = reinterpret_cast<dylinker_command*>(machfile + ptr);
+  char* nameAddr = machfile + ptr + dc->name.offset;
+  #ifdef VERBOSE
   std::cout << "\tDynamic Linker: " << nameAddr << std::endl;
+  #endif
 }
 
 void MachFile::loadUUIDCommand()
 {
-  uuid_command* uuid = reinterpret_cast<uuid_command*>(temp + ptr);
+  uuid_command* uuid = reinterpret_cast<uuid_command*>(machfile + ptr);
   uint8_t* id = uuid->uuid;
-
+  #ifdef VERBOSE
   std::cout << "\tUUID: \n\t\t";
   
   for (int i = 0; i < 16; ++i)
     std::cout << (uint16_t)id[i] << " ";
   
   std::cout << std::endl;
+  #endif
 }
 
 void MachFile::loadBuildVersion()
 {
-  build_version_command* b = reinterpret_cast<build_version_command*>(temp + ptr);
+  build_version_command* b = reinterpret_cast<build_version_command*>(machfile + ptr);
   uint32_t minos = b->minos;
+  #ifdef VERBOSE
   std::cout << std::dec << "\tMin OS: " 
     << ((minos & 0xFFFF0000) >> 16) << "." 
     << ((minos & 0x0000FF00) >> 8) << "." 
@@ -110,7 +157,7 @@ void MachFile::loadBuildVersion()
     << ((sdk & 0x0000FF00) >> 8) << "." 
     << (sdk & 0xFF) << std::endl;
 
-  char* btvAddr = temp + ptr + sizeof(build_version_command);
+  char* btvAddr = machfile + ptr + sizeof(build_version_command);
   build_tool_version* btv;
   for (int i = 0; i < b->ntools; i++)
   {
@@ -118,24 +165,30 @@ void MachFile::loadBuildVersion()
     std::cout << "\tTools: " << toStringTOOL(btv->tool) << " v" 
       << std::hex << (uint32_t) btv->version << std::endl;
   }
+  #endif
 }
 
 void MachFile::loadSourceVersion()
 {
-  source_version_command* s = reinterpret_cast<source_version_command*>(temp + ptr);
+  source_version_command* s = reinterpret_cast<source_version_command*>(machfile + ptr);
+#ifdef VERBOSE
   std::cout << "\tSource Version: " << s->version << std::endl;
+#endif
 }
 
 void MachFile::loadEntryPointCommand()
 {
-  entry_point_command* ep = reinterpret_cast<entry_point_command*>(temp + ptr);
+  entry_point_command* ep = reinterpret_cast<entry_point_command*>(machfile + ptr);
+#ifdef VERBOSE
   std::cout << RED"Entrypoint offset: " RESET << "0x"  << std::hex << ep->entryoff << std::endl;
+#endif
 }
 
 void MachFile::loadDylibCommand()
 {
-  dylib_command* dc = reinterpret_cast<dylib_command*>(temp + ptr);
-  char* nameAddr = temp + ptr + dc->dylib.name.offset;
+  dylib_command* dc = reinterpret_cast<dylib_command*>(machfile + ptr);
+  char* nameAddr = machfile + ptr + dc->dylib.name.offset;
+#ifdef VERBOSE
   std::cout << "\tDylib pathname: " << nameAddr << std::endl;
 
   std::cout << std::hex << "\tCurrent Version: " 
@@ -143,15 +196,18 @@ void MachFile::loadDylibCommand()
 
   std::cout << "\tCompatability Version: " 
     << dc->dylib.compatibility_version << std::endl;
+#endif
 }
 
 void MachFile::loadLinkeditDataCommand()
 {
-  linkedit_data_command* ldc = reinterpret_cast<linkedit_data_command*>(temp + ptr);
+  linkedit_data_command* ldc = reinterpret_cast<linkedit_data_command*>(machfile + ptr);
+#ifdef VERBOSE
   std::cout << RED"\tOffset of data in __LINKEDIT segment: " RESET << "0x"  
     << std::hex << ldc->dataoff << std::endl;
 
   std::cout << GREEN"\tData size: " RESET << "0x"  << ldc->datasize << std::endl;
+#endif
 }
 
 // defined external symbols sorted by name
@@ -170,77 +226,84 @@ void MachFile::parseRefTable(uint32_t offset, uint32_t count)
   std::cout << "This is for dynamically linked shared library files only" << std::endl;
 }
 
-void MachFile::parseSymbolTable(uint32_t offset, uint32_t count)
+void MachFile::parseSymbolTable(uintptr_t tableStart, uint32_t count)
 {
   nlist_64* symEntry;
   for (int i = 0; i < count; ++i)
   {
-    symEntry = reinterpret_cast<nlist_64*>(temp + ptr + offset + i*sizeof(nlist_64));
-    std::cout << "\t\ttype: " << toStringN((uint16_t)symEntry->n_type) 
-      << " section number: " << std::hex << (uint16_t) symEntry->n_sect
-      << " desc: " << toStringN(symEntry->n_desc) 
-      << " "  RESET << "(0x"  << std::hex << symEntry->n_desc << ") "
-      << " value: " << toStringN(symEntry->n_value) 
-      << " "  RESET << "(0x"  << std::hex << symEntry->n_value << ") "<< std::endl;
+    symEntry = reinterpret_cast<nlist_64*>(tableStart+ i*sizeof(nlist_64));
+    std::cout << "\t\ttype: " << toStringN(N_STAB & symEntry->n_type);
+    std::cout << " section number: " << std::dec << (uint16_t) symEntry->n_sect;
+    parseTwoLevel(symEntry->n_desc);
+    std::cout << " value:"  << "(0x"  << std::hex << symEntry->n_value << ") " << toStringN(symEntry->n_value) << std::endl;
   }
 }
 
+void MachFile::parseTwoLevel(uint16_t n_desc)
+{
+  if (symbolsInfo.isTwoLevel)
+  {
+    uint8_t ordinal = GET_LIBRARY_ORDINAL(n_desc);
+    std::cout << "\t\tlibrary ordinal: " << std::dec << (uint16_t)ordinal << " " << toStringREFERENCE(REFERENCE_TYPE & n_desc);
+  }
+  else
+  {
+    std::cout << "\t\tdesc: " << toStringREFERENCE(REFERENCE_TYPE & n_desc) << "(0x"  << std::hex << (uint16_t) n_desc << ") ";
+  } 
+}
+
+// describes the dynamic linking table
 void MachFile::loadDysymtabCommand()
 {
-  dysymtab_command* dc = reinterpret_cast<dysymtab_command*>(temp + ptr);
+  dysymtab_command* dc = reinterpret_cast<dysymtab_command*>(machfile + ptr);
   // These symbols used for dynamic binding
 
-  std::cout << "\texternal symbols at index: " RESET << "0x"  
-    << std::hex << dc->iextdefsym << std::dec << MAGENTA" (count: "  RESET
-    << dc->nextdefsym << ")" << std::endl;
+  std::cout << "\texternal symbols at index: " RESET << "0x"  << std::hex << dc->iextdefsym;
+  std::cout << std::dec << MAGENTA" (count: "  RESET << dc->nextdefsym << ")" << std::endl;
+  parseSymbolTable(symbolsInfo.symTablePtr + dc->iextdefsym * (sizeof (nlist_64)), dc->nextdefsym);
 
-  std::cout << "\tundefined symbols at index: " RESET << "0x" 
-    << std::hex << dc->iundefsym << std::dec << MAGENTA" (count: "  RESET
-    << dc->nundefsym << ")" << std::endl;
+  std::cout << "\tundefined symbols at index: " RESET << "0x" << std::hex << dc->iundefsym;
+  std::cout << std::dec << MAGENTA" (count: "  RESET << dc->nundefsym << ")" << std::endl;
+  parseSymbolTable(symbolsInfo.symTablePtr +  dc->iundefsym * (sizeof (nlist_64)), dc->nundefsym);
   // If this is a dynamic linked shared library, then binding is indirectly through module and reference table
 
   // This is for dynamically liked shared library files only
-  std::cout << RED"\ttable of contents at offset: " RESET << "0x" 
-    << std::hex << dc->tocoff << std::dec << MAGENTA" (count: "  RESET
-    << dc->ntoc << ")"<< std::endl;
+  std::cout << RED"\ttable of contents at offset: " RESET << "0x" << std::hex << dc->tocoff;
+  std::cout << std::dec << MAGENTA" (count: "  RESET << dc->ntoc << ")"<< std::endl;
   if (dc->ntoc)
     parseToC(dc->tocoff, dc->ntoc);
 
   // This is for dynamic binding of object files ("modules")
-  std::cout << RED"\tmodule table at offset: " RESET << "0x" 
-    << std::hex << dc->modtaboff << std::dec << MAGENTA" (count: " RESET
-    << dc->nmodtab << ")"<< std::endl;
+  std::cout << RED"\tmodule table at offset: " RESET << "0x" << std::hex << dc->modtaboff;
+  std::cout << std::dec << MAGENTA" (count: " RESET << dc->nmodtab << ")"<< std::endl;
   if (dc->nmodtab)
     parseModuleTable(dc->modtaboff, dc->nmodtab);
 
   // The external references that each module makes (dynamically linked shared library files only)
-  std::cout << RED"\texternal reference symbol table at offset: " RESET << "0x"  
-    << std::hex << dc->extrefsymoff << std::dec << MAGENTA" (count: " RESET 
-    << dc->nextrefsyms << ")"<< std::endl;
+  std::cout << RED"\texternal reference symbol table at offset: " RESET << "0x"  << std::hex << dc->extrefsymoff;
+  std::cout << std::dec << MAGENTA" (count: " RESET << dc->nextrefsyms << ")"<< std::endl;
   if (dc->nextrefsyms)
-    parseModuleTable(dc->extrefsymoff, dc->nextdefsym);
+    parseModuleTable(dc->extrefsymoff, dc->nextrefsyms);
   
   // The indirect references "symbol pointers" and "routine stubs"
-  std::cout << RED"\tindirect symbol table at offset: " RESET << "0x" 
-    << std::hex << dc->indirectsymoff << std::dec << MAGENTA" (count: " RESET 
-    << dc->nindirectsyms << ")"<< std::endl;
-  // if (dc->nindirectsyms)
-  //   parseSymbolTable(dc->nindirectsyms, dc->nindirectsyms);
+  std::cout << RED"\tindirect symbol table at offset: " RESET << "0x" << std::hex << dc->indirectsymoff;
+  std::cout << std::dec << MAGENTA" (count: " RESET << dc->nindirectsyms << ")"<< std::endl;
+  symbolsInfo.indirSymTable = reinterpret_cast<uintptr_t>(machfile + dc->indirectsymoff);
+  parseSymbolTable((symbolsInfo.indirSymTable) , dc->nindirectsyms);
 
   // External relocation entries
-  std::cout << RED"\texternal relocation entries at offset: " RESET << "0x" 
-    << std::hex << dc->extreloff << std::dec << MAGENTA" (count: "  RESET
-    << dc->nextrel << ")"<< std::endl;
+  std::cout << RED"\texternal relocation entries at offset: " RESET << "0x" << std::hex << dc->extreloff; 
+  std::cout << std::dec << MAGENTA" (count: "  RESET << dc->nextrel << ")"<< std::endl;
 
   // Local relocation entries (only used if module is moved from statically linked edited address)
-  std::cout << RED"\tlocal relocation entries at offset: " RESET << "0x" 
-    << std::hex << dc->locreloff << std::dec << MAGENTA" (count: "  RESET
-    << dc->nlocrel << ")"<< std::endl;
+  std::cout << RED"\tlocal relocation entries at offset: " RESET << "0x" << std::hex << dc->locreloff;
+  std::cout << std::dec << MAGENTA" (count: "  RESET << dc->nlocrel << ")"<< std::endl;
 
 }
 
 void MachFile::parseLC(size_t i)
 {
+
     std::cout << "\nLC Header: " << toStringLC(pLoadCommands[i]->cmd) << std::endl;
     std::cout << GREEN"Header Size: " RESET << "0x"  << std::hex << pLoadCommands[i]->cmdsize << std::endl;
     switch(pLoadCommands[i]->cmd){
@@ -282,14 +345,18 @@ void MachFile::parseLC(size_t i)
 
 void MachFile::parseHeader()
 {
-  pMachHeader = reinterpret_cast<mach_header_64*>(temp);
+  pMachHeader = reinterpret_cast<mach_header_64*>(machfile);
+  symbolsInfo.isTwoLevel = pMachHeader->flags & MH_TWOLEVEL;
+  if (symbolsInfo.isTwoLevel)
+    std::cout << "This file is TWOLEVEL" << std::endl;
   ptr += sizeof(mach_header_64);
 }
 
+// Constructor
 MachFile::MachFile(const char* fileName) : fileName(fileName), ptr(0)
 {
   std::ifstream machFile (fileName, std::ios::in | std::ios::binary);
-  machFile.read(temp, 10000);
+  machFile.read(machfile, MAX_FILE_SIZE);
   handleError(machFile.fail());
 
   parseHeader();
@@ -298,7 +365,7 @@ MachFile::MachFile(const char* fileName) : fileName(fileName), ptr(0)
   for (int i = 0; i < pMachHeader->ncmds; ++i)
   {
     // Save the address of the headers of each segment
-    pLoadCommands[i] = reinterpret_cast<load_command*>(temp + ptr);
+    pLoadCommands[i] = reinterpret_cast<load_command*>(machfile + ptr);
     parseLC(i);
     // Go to the next segment
     ptr += pLoadCommands[i]->cmdsize;
@@ -312,7 +379,7 @@ void MachFile::printHeader() {
   std::cout << "cpusubtype: " RESET << "0x"  << pMachHeader->cpusubtype << std::endl;
   std::cout << "filetype: " <<toStringMH(pMachHeader->filetype) << 
     " "  RESET << "(0x"  << std::hex << pMachHeader->filetype << ")" << std::endl;
-  std::cout << std::dec << MAGENTA"ncmds: "RESET << pMachHeader->ncmds << std::endl;
+  std::cout << std::dec << MAGENTA "ncmds: " RESET << pMachHeader->ncmds << std::endl;
   std::cout << GREEN"sizeofcmds: " RESET<< pMachHeader->sizeofcmds << std::endl;
   std::cout << std:: hex << "flags: " RESET << "0x"  << pMachHeader->flags << std::endl;
 }

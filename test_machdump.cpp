@@ -21,7 +21,7 @@ void runTest(int (*testFn)(), string testName ) {
     cout << testName << endl;
 }
 
-bool assertEqual(uint32_t expect, uint32_t got)
+bool assertEqual(uint64_t got, uint64_t expect)
 {
     if (expect == got) 
         return true;
@@ -43,11 +43,30 @@ int testExecutable()
     return assertEqual(testHeaplib.pMachHeader->filetype, MH_EXECUTE);
 }
 
-// int testBase()
-// {
-//         MachFile testHeaplib("testVectors/test_heaplib");
-//         return assertEqual(testHeaplib.basicInfo.baseOfCode, 0x100000000);
-// }
+int testSectionInfo()
+{
+    MachFile testAout("testVectors/a.out");
+    uint8_t bOk = 1;
+    section_64* sec64 = reinterpret_cast<section_64*>(testAout.loaderInfo.nlSymbolPtr);
+    bOk &= assertEqual(sec64->addr, 0x100016000);
+    sec64 = reinterpret_cast<section_64*>(testAout.loaderInfo.laSymbolPtr);
+    bOk &= assertEqual(sec64->addr, 0x100016020);
+    sec64 = reinterpret_cast<section_64*>(testAout.loaderInfo.textPtr);
+    bOk &= assertEqual(sec64->addr, 0x100000f40);
+    sec64 = reinterpret_cast<section_64*>(testAout.loaderInfo.dataPtr);
+    bOk &= assertEqual(sec64->addr, 0x1000161c8);
+    segment_command_64* seg64 = reinterpret_cast<segment_command_64*>(testAout.loaderInfo.linkedItSegPtr);
+    bOk &= assertEqual(seg64->vmaddr, 0x101364000);
+    return bOk;
+}
+
+void testSymbolsInfo()
+{
+    MachFile testAout("testVectors/a.out");
+    uint8_t bOk = 1;
+    bOk &= assertEqual(testAout.symbolsInfo.numIndirEntries, 53);
+
+}
 
 int lazytest()
 {
@@ -61,7 +80,8 @@ int lazytest()
 int main() {
     // runTest(testGetMagic, "testGetMagic");
     // runTest(testExecutable, "testExecutable");
-    lazytest();
+    // lazytest();
+    runTest(testSectionInfo, "testSectionInfo");
     // runTest(testEntry, "testEntry");
     // runTest(testBase, "TestBase");
 }
