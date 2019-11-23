@@ -232,7 +232,16 @@ void MachFile::parseSymbolTable(uintptr_t tableStart, uint32_t count)
   for (int i = 0; i < count; ++i)
   {
     symEntry = reinterpret_cast<nlist_64*>(tableStart+ i*sizeof(nlist_64));
-    std::cout << "\t\ttype: " << toStringN(N_STAB & symEntry->n_type);
+    std::string stype = toStringN(N_TYPE & symEntry->n_type);
+    if (N_STAB & symEntry->n_type)
+      std::cout << "\t\tN_STAB entry (debug): " << toStringSTAB(symEntry->n_type);
+    else if (N_PEXT & symEntry->n_type)
+      std::cout << "\t\tN_PEXT (private extern) " << stype;
+    else if (N_EXT & symEntry->n_type)
+      std::cout << "\t\t N_EXT (external symbol) "<< stype;
+    else
+      std::cout << "\t\t" << stype;
+
     std::cout << " section number: " << std::dec << (uint16_t) symEntry->n_sect;
     parseTwoLevel(symEntry->n_desc);
     std::cout << " value:"  << "(0x"  << std::hex << symEntry->n_value << ") " << toStringN(symEntry->n_value) << std::endl;

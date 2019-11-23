@@ -545,6 +545,10 @@ std::string toStringN(uint64_t s){
           return " N_INDR ";
     case N_UNDF:
           return " N_UNDF ";
+    case N_WEAK_REF:
+          return " N_WEAK_REF ";
+    case N_WEAK_DEF:
+          return " N_WEAK_DEF ";
     case N_ALT_ENTRY:
           return " N_ALT_ENTRY ";
     case N_SYMBOL_RESOLVER:
@@ -559,12 +563,15 @@ std::string toStringN(uint64_t s){
           return " N_NO_DEAD_STRIP ";
     case N_ARM_THUMB_DEF:
           return " N_ARM_THUMB_DEF ";
-    case N_STAB:
-          return " N_STAB ";
     case N_TYPE:
-          return " N_TYPE ";
-    case N_EXT:
-          return " N_EXT ";
+          return "N_UNDF ";
+    default:
+        return "";
+    }
+}
+
+std::string toStringSTAB(uint64_t s){
+    switch(s){
     case N_SLINE:
           return " N_SLINE ";
     case N_SSYM:
@@ -597,10 +604,14 @@ std::string toStringN(uint64_t s){
           return " N_PARAMS ";
     case N_PC:
           return " N_PC ";
+    case N_GSYM:
+          return " N_GSYM ";
     case N_STSYM:
           return " N_STSYM ";
     case N_LCSYM:
           return " N_LCSYM ";
+    case N_RBRAC:
+          return " N_RBRAC ";
     case N_LENG:
           return " N_LENG ";
     case N_FUN:
