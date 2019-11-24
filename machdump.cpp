@@ -39,15 +39,25 @@ MachFile::MachFile(const char* fileName) : ptr(0)
   fs.close();
   
   mach_header_64* pMachHeader = reinterpret_cast<mach_header_64*>(machfile);
+#ifdef VERBOSE
   printHeader(pMachHeader);
+#endif
   parseHeader(pMachHeader);
+
+  if (basicInfo.magic != MH_MAGIC_64)
+  {
+    std::cout << "Mach-O 64 files only" << std::endl;
+    exit(1);
+  }
 
   // parse each LOAD command
   load_command* pLoadCommand;
   for (int i = 0; i < pMachHeader->ncmds; ++i)
   {
     pLoadCommand = reinterpret_cast<load_command*>(machfile + ptr);
+#ifdef VERBOSE
     printLC(pLoadCommand, i);
+#endif
     parseLC(pLoadCommand);
     // Go to the next segment
     ptr += pLoadCommand->cmdsize;
@@ -66,8 +76,6 @@ MachFile::~MachFile()
 void MachFile::parseHeader(mach_header_64* pMachHeader)
 {
   symbolsInfo.isTwoLevel = pMachHeader->flags & MH_TWOLEVEL;
-  if (symbolsInfo.isTwoLevel)
-    std::cout << "This file is TWOLEVEL" << std::endl;
   basicInfo.magic = pMachHeader->magic;
   basicInfo.numberOfLoadCommands = pMachHeader->ncmds;
   ptr += sizeof(mach_header_64);
@@ -84,6 +92,8 @@ void MachFile::printHeader(mach_header_64* pMachHeader)
   std::cout << std::dec << MAGENTA "\tncmds: " RESET << pMachHeader->ncmds << std::endl;
   std::cout << GREEN"\tsizeofcmds: " RESET<< pMachHeader->sizeofcmds << std::endl;
   std::cout << std:: hex << "\tflags: " RESET << "0x"  << pMachHeader->flags << std::endl;
+  if (symbolsInfo.isTwoLevel)
+    std::cout << "This file is TWOLEVEL" << std::endl;
 }
 
 void MachFile::parseLC(load_command* pLoadCommand)
@@ -120,7 +130,7 @@ void MachFile::parseLC(load_command* pLoadCommand)
       case LC_LINKER_OPTIMIZATION_HINT:
         return loadLinkeditDataCommand();
       default:
-        std::cout << "Cmd ID: " << std::hex << "0x" << pLoadCommand->cmd << std::endl;
+        std::cout << "No action taken for Cmd ID: " << std::hex << "0x" << pLoadCommand->cmd << std::endl;
     }
 }
 
@@ -356,14 +366,17 @@ void MachFile::loadSegmentCommand64()
 {
   segment_command_64* seg64 = reinterpret_cast<segment_command_64*>(machfile + ptr);
   parseSegmentCommand64(seg64);
+#ifdef VERBOSE
   printSegmentCommand64(seg64);
-  
+#endif
   if (seg64->nsects == 0 ) return;
 
   for(size_t i = 0; i < seg64->nsects; ++i){
     section_64* sec64 = reinterpret_cast<section_64*>(machfile + ptr + sizeof(segment_command_64) + i*sizeof(section_64));
     parseSection64(sec64);
+#ifdef VERBOSE
     printSection64(sec64);
+#endif
   }
 }
 
@@ -371,14 +384,18 @@ void MachFile::loadDyldInfoCommand()
 {
   dyld_info_command* dic = reinterpret_cast<dyld_info_command*>(machfile + ptr);
   parseDyldInfoCommand(dic);
+#ifdef VERBOSE
   printDyldInfoCommand(dic);
+#endif
 }
 
 void MachFile::loadSymtabCommand()
 {
   symtab_command* sc = reinterpret_cast<symtab_command*>(machfile + ptr);
   parseSymtabCommand(sc);
+#ifdef VERBOSE
   printSymtabCommand(sc);
+#endif
 }
 
 // describes the dynamic linking table (symbols used for dynamic binding)
@@ -386,7 +403,9 @@ void MachFile::loadDysymtabCommand()
 {
   dysymtab_command* dc = reinterpret_cast<dysymtab_command*>(machfile + ptr);
   parseDsymtabCommand(dc);
+#ifdef VERBOSE
   printDsymtabCommand(dc);
+#endif
 }
 
 // For dynamically linked executables, this command specifies the name of the dynamic linker
@@ -395,26 +414,34 @@ void MachFile::loadDysymtabCommand()
 void MachFile::loadDylinkerCommand()
 {
   dylinker_command* dc = reinterpret_cast<dylinker_command*>(machfile + ptr);
+#ifdef VERBOSE
   printDylinkerCommand(dc);
+#endif
 }
 
 void MachFile::loadUUIDCommand()
 {
   uuid_command* uuid = reinterpret_cast<uuid_command*>(machfile + ptr);
+#ifdef VERBOSE
   printUUIDCommand(uuid);
+#endif
 }
 
 void MachFile::loadBuildVersion()
 {
   build_version_command* b = reinterpret_cast<build_version_command*>(machfile + ptr);
+#ifdef VERBOSE
   printBuildVersionCommand(b);
+#endif
 }
 
 void MachFile::loadEntryPointCommand()
 {
   entry_point_command* ep = reinterpret_cast<entry_point_command*>(machfile + ptr);
   parseEntrypointCommand(ep);
+#ifdef VERBOSE
   printEntrypointCommand(ep);
+#endif
 }
 // dylib struct is data used by dynamic linker to match shared library 
 // against files that have linked to it
@@ -422,14 +449,18 @@ void MachFile::loadDylibCommand()
 {
   dylib_command* dc = reinterpret_cast<dylib_command*>(machfile + ptr);
   parseDylibCommand(dc);
+#ifdef VERBOSE
   printDylibCommand(dc);
+#endif
 }
 
 void MachFile::loadLinkeditDataCommand()
 {
   linkedit_data_command* ldc = reinterpret_cast<linkedit_data_command*>(machfile + ptr);
   parseLinkeditDataCommand(ldc);
+#ifdef VERBOSE
   printLinkeditDataCommand(ldc);
+#endif
 }
 
 // ---------------------------------------------------------------------------

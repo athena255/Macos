@@ -1,16 +1,7 @@
 
 #include <iostream>
-#include "machdump.h"
+#include "../machdump.h"
 using namespace std;
-
-/* 
- * FUNCTIONS BEING TESTED: init & alloc
- * SPECIFICATION BEING TESTED:
-
- *
- * MANIFESTATION OF ERROR:
-
- */
 
 void runTest(int (*testFn)(), string testName ) {
     if (testFn()) {
@@ -58,7 +49,6 @@ void testSymbolsInfo()
 int lazytest()
 {
     MachFile testHeaplib("testVectors/a.out");
-    // testHeaplib.printLoadCommands();
     return 0;
 }
 
@@ -69,11 +59,10 @@ void testLib()
 
 
 int main() {
-    // runTest(testGetMagic, "testGetMagic");
     // runTest(testExecutable, "testExecutable");
      lazytest();
     // runTest(testSectionInfo, "testSectionInfo");
-    // testLib();
+     testLib();
     // runTest(testEntry, "testEntry");
     // runTest(testBase, "TestBase");
 }
