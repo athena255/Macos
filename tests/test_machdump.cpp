@@ -17,7 +17,7 @@ bool assertEqual(uint64_t got, uint64_t expect)
     if (expect == got) 
         return true;
 
-    cout << RED "Expected " << expect 
+    cout << dec << RED "Expected " << expect 
         << " got " << got << RESET << endl;
     return false;
 }
@@ -38,18 +38,28 @@ int testSectionInfo()
     return bOk;
 }
 
-void testSymbolsInfo()
+int testSymbolsInfo()
 {
     MachFile testAout("testVectors/a.out");
     uint8_t bOk = 1;
     bOk &= assertEqual(testAout.symbolsInfo.numIndirEntries, 53);
+    return bOk;
+}
 
+int testBasicInfo()
+{
+    MachFile testAout("testVectors/a.out");
+    uint8_t bOk = 1;
+    bOk &= assertEqual(testAout.basicInfo.magic,  0xfeedfacf);
+    bOk &= assertEqual(testAout.basicInfo.numberOfLoadCommands, 15);
+    bOk &= assertEqual(testAout.basicInfo.entrypointOffset, 0x7100);
+    return bOk;
 }
 
 int lazytest()
 {
     MachFile testHeaplib("testVectors/a.out");
-    return 0;
+    return 1;
 }
 
 void testLib()
@@ -59,10 +69,10 @@ void testLib()
 
 
 int main() {
-    // runTest(testExecutable, "testExecutable");
-     lazytest();
-    // runTest(testSectionInfo, "testSectionInfo");
-     testLib();
-    // runTest(testEntry, "testEntry");
-    // runTest(testBase, "TestBase");
+    lazytest();
+    runTest(testBasicInfo, "testSymbolsInfo");
+    runTest(testSectionInfo, "testSectionInfo");
+    runTest(testSymbolsInfo, "testSymbolsInfo");
+    runTest(lazytest, "testVectors/a.out");
+    testLib(); // should complain
 }

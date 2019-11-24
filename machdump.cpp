@@ -172,6 +172,7 @@ void MachFile::parseSection64(section_64* sec64)
   else if ( !strncmp(sec64->sectname, "__la_symbol_ptr", 15)) // pointer to imported functions
   {
     loaderInfo.laSymbolPtr = reinterpret_cast<uintptr_t>(sec64);
+    symbolsInfo.numIndirEntries = (sec64->size/(1 << sec64->align));
   }
   else if ( !strncmp(sec64->sectname, "__data", 6))
   {
