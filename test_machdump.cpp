@@ -30,19 +30,6 @@ bool assertEqual(uint64_t got, uint64_t expect)
         << " got " << got << RESET << endl;
     return false;
 }
-
-int testGetMagic()
-{
-    MachFile testHeaplib("testVectors/test_heaplib");
-    return assertEqual(testHeaplib.pMachHeader->magic, MH_MAGIC_64);
-}
-
-int testExecutable()
-{
-    MachFile testHeaplib("testVectors/test_heaplib");
-    return assertEqual(testHeaplib.pMachHeader->filetype, MH_EXECUTE);
-}
-
 int testSectionInfo()
 {
     MachFile testAout("testVectors/a.out");
@@ -71,17 +58,22 @@ void testSymbolsInfo()
 int lazytest()
 {
     MachFile testHeaplib("testVectors/a.out");
-    testHeaplib.printHeader();
     // testHeaplib.printLoadCommands();
     return 0;
+}
+
+void testLib()
+{
+    MachFile testLib("/usr/lib/libSystem.B.dylib");
 }
 
 
 int main() {
     // runTest(testGetMagic, "testGetMagic");
     // runTest(testExecutable, "testExecutable");
-    // lazytest();
-    runTest(testSectionInfo, "testSectionInfo");
+     lazytest();
+    // runTest(testSectionInfo, "testSectionInfo");
+    // testLib();
     // runTest(testEntry, "testEntry");
     // runTest(testBase, "TestBase");
 }

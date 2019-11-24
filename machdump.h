@@ -1,41 +1,22 @@
 #pragma once
-
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 #include <mach-o/stab.h>
 
 #define RED     "\x1B[31m" // file offsets
 #define GREEN   "\x1B[32m" // size
-#define YELLOW  "\x1B[33m" 
+#define YELLOW  "\x1B[33m"  // index
 #define BLUE    "\x1B[34m" // vm addresses
 #define MAGENTA "\x1B[35m" // counts
 #define CYAN    "\x1B[36m"
 #define WHITE   "\x1B[37m"
 #define RESET   "\x1B[00m"
 
-struct GenInfo {
-  uintptr_t entryPoint;
-  uint32_t fileOffset;
-  uint32_t linkerInfo;
-};
-
 struct BasicInfo {
-  uintptr_t imageBase;
-  uint32_t sizeOfImage;
-  uint32_t baseOfCode;
-  uint32_t baseOfData;
-  uint32_t fileAlignment;
   uint32_t magic;
   uint32_t numberOfLoadCommands;
-  uint32_t timeDateStamp;
-};
-
-struct DirectoryInfo {
-  uintptr_t exportTable;
-  uintptr_t importTable;
-  uintptr_t resource;
-  uintptr_t tlvTable;
-  uintptr_t debug;
+  size_t fileSize;
+  uint32_t entrypointOffset; // entrypoint offset in the file
 };
 
 struct LoaderInfo {
@@ -51,9 +32,8 @@ struct SymbolsInfo {
   uintptr_t symTablePtr; // location of symtable in file
   size_t numIndirEntries; 
   uintptr_t indirSymTable; // location of indirect symbol table in file
+  uintptr_t strTablePtr; // location of string table in file
 };
-
-#define MAX_FILE_SIZE 0x20000
 
 class MachFile{
 
@@ -61,12 +41,43 @@ public:
 MachFile(const char* fileName);
 ~MachFile();
 
-void printHeader();
-void printLoadCommands();
+void printHeader(mach_header_64* pMachHeader);
+void parseHeader(mach_header_64* pMachHeader);
 
-void parseLC(size_t i);
-void parseHeader();
+void parseLC(load_command* pLoadCommand);
+void printLC(load_command* pLoadCommand, uint32_t lcNum);
 
+void parseSegmentCommand64(segment_command_64* seg64);
+void printSegmentCommand64(segment_command_64* seg64);
+
+void parseSection64(section_64* sec64);
+void printSection64(section_64* sec64);
+
+void parseDyldInfoCommand(dyld_info_command* dic); // does nothing
+void printDyldInfoCommand(dyld_info_command* dic);
+
+void parseSymtabCommand(symtab_command* sc);
+void printSymtabCommand(symtab_command* sc);
+
+void parseDsymtabCommand(dysymtab_command* dc);
+void printDsymtabCommand(dysymtab_command* dc);
+
+void parseEntrypointCommand(entry_point_command* ep);
+void printEntrypointCommand(entry_point_command* ep);
+
+void parseDylibCommand(dylib_command* dc); // does nothing
+void printDylibCommand(dylib_command* dc);
+
+void parseLinkeditDataCommand(linkedit_data_command* ldc); // does nothing
+void printLinkeditDataCommand(linkedit_data_command* ldc);
+
+void printDylinkerCommand(dylinker_command* dc);
+
+void printUUIDCommand(uuid_command* uuid);
+
+void printBuildVersionCommand(build_version_command* b);
+
+// Load Commands
 void loadSegmentCommand64();
 void loadDyldInfoCommand();
 void loadSymtabCommand();
@@ -74,7 +85,6 @@ void loadDysymtabCommand();
 void loadDylinkerCommand();
 void loadUUIDCommand();
 void loadBuildVersion();
-void loadSourceVersion();
 void loadEntryPointCommand();
 void loadDylibCommand();
 void loadLinkeditDataCommand();
@@ -83,25 +93,19 @@ void loadLinkeditDataCommand();
 void parseToC(uint32_t offset, uint32_t count);
 void parseModuleTable(uint32_t offset, uint32_t count);
 void parseRefTable(uint32_t offset, uint32_t count);
-void parseSymbolTable(uintptr_t tableStart, uint32_t count);
 void parseTwoLevel(uint16_t n_desc);
 
-// symbol tables handling
-void parseSection(section_64* sec64);
-void parseSegment(segment_command_64* seg64);
-void parseDysymTable(uintptr_t);
-void parseIndirTable(uintptr_t tableStart, uint32_t count);
+// part of Symbols
+void printNlist(nlist_64* symEntry); // print symbol table entries
+void printSymbolTable(uintptr_t tableStartAddr, uint32_t numEntries);
+void parseIndirtab(uintptr_t tableStartAddr, uint32_t numEntries); // does nothing
+void printIndirtab(uintptr_t tableStartAddr, uint32_t numEntries);
 
-GenInfo genInfo;
 BasicInfo basicInfo;
-DirectoryInfo dirInfo;
 LoaderInfo loaderInfo;
 SymbolsInfo symbolsInfo;
 
-const char* fileName;
-mach_header_64* pMachHeader;
-load_command** pLoadCommands;
-char machfile[MAX_FILE_SIZE];
+char* machfile;
 size_t ptr;
 
 };
