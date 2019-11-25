@@ -129,6 +129,9 @@ void MachFile::parseLC(load_command* pLoadCommand)
       case LC_DYLIB_CODE_SIGN_DRS:
       case LC_LINKER_OPTIMIZATION_HINT:
         return loadLinkeditDataCommand();
+      case LC_SOURCE_VERSION:
+        // we honestly don't care
+        return;
       default:
         std::cout << "No action taken for Cmd ID: " << std::hex << "0x" << pLoadCommand->cmd << std::endl;
     }
@@ -173,6 +176,7 @@ void MachFile::parseSection64(section_64* sec64)
   {
     loaderInfo.laSymbolPtr = reinterpret_cast<uintptr_t>(sec64);
     symbolsInfo.numIndirEntries = (sec64->size/(1 << sec64->align));
+    symbolsInfo.indirOffset = sec64->reserved1;
   }
   else if ( !strncmp(sec64->sectname, "__data", 6))
   {
@@ -248,10 +252,12 @@ void MachFile::printDsymtabCommand(dysymtab_command* dc)
   std::cout << YELLOW"\texternal symbols at index: " RESET << "0x"  << std::hex << dc->iextdefsym;
   std::cout << std::dec << MAGENTA" (count: "  RESET << dc->nextdefsym << ")" << std::endl;
   // printSymbolTable(symbolsInfo.symTablePtr + dc->iextdefsym * (sizeof (nlist_64)), dc->nextdefsym);
+  printSymbolTable(dc->iextdefsym, dc->nextdefsym);
 
   std::cout << YELLOW"\tundefined symbols at index: " RESET << "0x" << std::hex << dc->iundefsym;
   std::cout << std::dec << MAGENTA" (count: "  RESET << dc->nundefsym << ")" << std::endl;
   // printSymbolTable(symbolsInfo.symTablePtr +  dc->iundefsym * (sizeof (nlist_64)), dc->nundefsym);
+  printSymbolTable(dc->iundefsym, dc->nundefsym);
 
   // This is for dynamically liked shared library files only
   std::cout << RED"\ttable of contents at offset: " RESET << "0x" << std::hex << dc->tocoff;
@@ -268,7 +274,8 @@ void MachFile::printDsymtabCommand(dysymtab_command* dc)
   // The indirect references "symbol pointers" and "routine stubs"
   std::cout << RED"\tindirect symbol table at offset: " RESET << "0x" << std::hex << dc->indirectsymoff;
   std::cout << std::dec << MAGENTA" (count: " RESET << dc->nindirectsyms << ")"<< std::endl;
-  // printIndirtab((symbolsInfo.indirSymTable) , dc->nindirectsyms);
+  // printIndirtab( symbolsInfo.indirSymTable + symbolsInfo.indirOffset , dc->nindirectsyms);
+  printIndirtab();
 
   // External relocation entries
   std::cout << RED"\texternal relocation entries at offset: " RESET << "0x" << std::hex << dc->extreloff; 
@@ -506,26 +513,38 @@ void MachFile::printNlist(nlist_64* symEntry)
 {
     std::string stype = toStringN(N_TYPE & symEntry->n_type);
     if (N_STAB & symEntry->n_type)
-      std::cout << "\t\tN_STAB entry (debug): " << toStringSTAB(symEntry->n_type);
+      std::cout << "\t\t\tN_STAB entry (debug): " << toStringSTAB(symEntry->n_type);
     else if (N_PEXT & symEntry->n_type)
-      std::cout << "\t\tN_PEXT (private extern) " << stype;
+      std::cout << "\t\t\tN_PEXT (private extern) " << stype;
     else if (N_EXT & symEntry->n_type)
-      std::cout << "\t\t N_EXT (external symbol) "<< stype;
+      std::cout << "\t\t\tN_EXT (external symbol) "<< stype;
     else
-      std::cout << "\t\t" << stype;
+      std::cout << "\t\t\t" << stype;
     std::cout << " section number: " << std::dec << (uint16_t) symEntry->n_sect;
     parseTwoLevel(symEntry->n_desc);
     std::cout << " value:"  << "(0x"  << std::hex << symEntry->n_value << ") " 
       << toStringN(symEntry->n_value) << std::endl;
 }
 
-void MachFile::printSymbolTable(uintptr_t tableStartAddr, uint32_t numEntries)
+void MachFile::printSymEntry(uint32_t symtabIndex)
+{
+    nlist_64* symEntry = reinterpret_cast<nlist_64*>(symbolsInfo.symTablePtr + symtabIndex*sizeof(nlist_64));
+    uint32_t strIdx = symEntry->n_un.n_strx; 
+    std::cout << "\t\t" << std::dec << symtabIndex;
+    std::cout << std::dec << "\t\t\t" << strIdx;
+    std::cout <<  "\t\t\t" <<reinterpret_cast<char*>(symbolsInfo.strTablePtr + strIdx);
+#ifdef VERBOSE
+    printNlist(symEntry);
+#endif
+}
+
+void MachFile::printSymbolTable(uintptr_t symtabStartIdx, uint32_t numEntries)
 {
    nlist_64* symEntry;
+   std::cout << YELLOW "\t\tSymtab Index \t\tStrTab Index\t\tValue " RESET << std::endl;
   for (int i = 0; i < numEntries; ++i)
   {
-    symEntry = reinterpret_cast<nlist_64*>(tableStartAddr+ i*sizeof(nlist_64));
-    printNlist(symEntry);
+    printSymEntry(i + symtabStartIdx);
   } 
 }
 
@@ -534,22 +553,13 @@ void MachFile::parseIndirtab(uintptr_t tableStartAddr, uint32_t numEntries)
   // indirect symbol table entry is 32 bit index into the symbol table 
 }
 
-void MachFile::printIndirtab(uintptr_t tableStartAddr, uint32_t numEntries)
+void MachFile::printIndirtab()
 {
   uint32_t* indirEntry; // pointer to an index into the sym table
-  nlist_64* symEntry;
   std::cout << YELLOW "\t\tSymtab Index \t\tStrTab Index\t\tValue " RESET << std::endl;
-  for (int i = 0; i < numEntries; ++i)
+  for (int i = 0; i < symbolsInfo.numIndirEntries; ++i)
   {
-    indirEntry = reinterpret_cast<uint32_t*>(tableStartAddr + i*sizeof(uint32_t));
-    std::cout << "\t\t" << std::dec << *indirEntry;
-    
-    symEntry = reinterpret_cast<nlist_64*>((nlist_64*)symbolsInfo.symTablePtr + *indirEntry);
-    uint32_t strIdx = symEntry->n_un.n_strx; 
-    std::cout << "\t\t\t" << symEntry->n_un.n_strx;
-    std::cout <<  "\t\t\t" <<reinterpret_cast<char*>(symbolsInfo.strTablePtr + strIdx) << std::endl;
-#ifdef VERBOSE
-    printNlist(symEntry);
-#endif
+    indirEntry = reinterpret_cast<uint32_t*>(symbolsInfo.indirSymTable + i*sizeof(uint32_t));
+    printSymEntry(*indirEntry);
   }
 }

@@ -2,8 +2,8 @@ CXX=g++
 TEST_DIR = tests/
 CFLAGS = -I.
 
-machdemo: machdump.cpp $(TEST_DIR)test_machdump.cpp
-	$(CXX) -DVERBOSE -o a.out machdump.cpp $(TEST_DIR)test_machdump.cpp $(CFLAGS)
+mach: machdump.cpp client.cpp
+	$(CXX) -DVERBOSE -o client machdump.cpp client.cpp $(CFLAGS)
 
 machdumptest: machdump.cpp $(TEST_DIR)test_machdump.cpp
 	$(CXX) -o a.out machdump.cpp $(TEST_DIR)test_machdump.cpp $(CFLAGS)

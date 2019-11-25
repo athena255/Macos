@@ -31,6 +31,7 @@ struct SymbolsInfo {
   uint8_t isTwoLevel; // MH_TWOLEVEL flag of mach_header is set
   uintptr_t symTablePtr; // location of symtable in file
   size_t numIndirEntries; 
+  uint32_t indirOffset;
   uintptr_t indirSymTable; // location of indirect symbol table in file
   uintptr_t strTablePtr; // location of string table in file
 };
@@ -97,9 +98,12 @@ void parseTwoLevel(uint16_t n_desc);
 
 // part of Symbols
 void printNlist(nlist_64* symEntry); // print symbol table entries
-void printSymbolTable(uintptr_t tableStartAddr, uint32_t numEntries);
+// Print [numEntries] amount of entries from the symbol table starting at
+// index [symtabStartIdx]
+void printSymbolTable(uintptr_t symtabStartIdx, uint32_t numEntries);
 void parseIndirtab(uintptr_t tableStartAddr, uint32_t numEntries); // does nothing
-void printIndirtab(uintptr_t tableStartAddr, uint32_t numEntries);
+void printIndirtab(); // print the entire indirect table
+void printSymEntry(uint32_t symtabIndex); // print the symbol at symtabIndex
 
 BasicInfo basicInfo;
 LoaderInfo loaderInfo;
