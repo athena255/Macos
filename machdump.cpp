@@ -206,21 +206,44 @@ void MachFile::parseDyldInfoCommand(dyld_info_command* dic)
 
 void MachFile::printDyldInfoCommand(dyld_info_command* dic)
 {
-  std::cout << RED"\trebase info at offset: " RESET << "0x"  << std::hex << 
+  std::cout << RED"\trebase opcodes at offset: " RESET << "0x"  << std::hex << 
     dic->rebase_off << GREEN" size "  RESET << "(0x"  << dic->rebase_size << ")" << std::endl ;
+  // disasRebase(dic->rebase_off, dic->rebase_size);
 
-  std::cout << RED"\tbind info at offset: " RESET << "0x"  
+  std::cout << RED"\tbind opcodes at offset: " RESET << "0x"  
     << dic->bind_off << GREEN" size "  RESET << "(0x"  << dic->bind_size << ")" << std::endl ;
+  // disasBind(dic->bind_off, dic->bind_size);
 
-  std::cout << RED"\tweak_bind info at offset: " RESET << "0x" 
+  std::cout << RED"\tweak_bind opcodes at offset: " RESET << "0x" 
     << dic->weak_bind_off << GREEN" size "  RESET << "(0x" 
     << dic->weak_bind_size << ")" << std::endl ;
 
-  std::cout << RED"\tlazy_bind info at offset: " RESET << "0x" 
+  std::cout << RED"\tlazy_bind opcodes at offset: " RESET << "0x" 
     << dic->lazy_bind_off << GREEN" size "  RESET << "(0x"  << dic->lazy_bind_size << ")" << std::endl ;
 
-  std::cout << RED"\texport info at offset: " RESET << "0x" 
+  std::cout << RED"\texport opcodes at offset: " RESET << "0x" 
     << dic->export_off << GREEN" size "  RESET << "(0x"  << dic->export_size << ")" << std::endl ;
+}
+
+void MachFile::disasRebase(uint32_t offset, uint32_t size)
+{
+  // opcodes are one byte long
+  for (int i = 0; i < size; ++i)
+  {
+    // <seg-index, seg-offset, type>
+    uint8_t* opcode = reinterpret_cast<uint8_t*>(machfile) + offset + i;
+    std::cout << "\t\t" << toStringREBASE(REBASE_OPCODE_MASK & *opcode) << " (0x" << std::hex << (0xF & *opcode) << ")" << std::endl;
+  }
+}
+
+void MachFile::disasBind(uint32_t offset, uint32_t size)
+{
+  // <seg-index, seg-offset, type, symbol-library-ordinal, symbol-name, addend>
+  for (int i = 0; i < size; ++i)
+  {
+    uint8_t* opcode = reinterpret_cast<uint8_t*>(machfile) + offset + i;
+    std::cout << "\t\t" << toStringBIND(BIND_OPCODE_MASK & *opcode) << " (0x" << std::hex << (0xF & *opcode) << ")" << std::endl;
+  }
 }
 
 void MachFile::parseSymtabCommand(symtab_command* sc)
@@ -306,7 +329,7 @@ void MachFile::printDylibCommand(dylib_command* dc)
 
   std::cout << "\tDylib pathname: " << nameAddr << std::endl;
 
-  std::cout << "\tCompatibility Version: ";
+  std::cout << "\tCurrent Version: ";
   parseVersions(dc->dylib.current_version);
   std::cout << std::endl;
 
@@ -317,6 +340,12 @@ void MachFile::printDylibCommand(dylib_command* dc)
 
 void MachFile::parseLinkeditDataCommand(linkedit_data_command* ldc)
 {
+  // table of non-instructions in __text
+  if (ldc->cmd == LC_DATA_IN_CODE)
+  {
+    // points to an array of data_in_code entries
+    parseDataInCode(ldc->dataoff, ldc->datasize);
+  }
 }
 
 void MachFile::printLinkeditDataCommand(linkedit_data_command* ldc)
@@ -324,6 +353,28 @@ void MachFile::printLinkeditDataCommand(linkedit_data_command* ldc)
   std::cout << RED"\tOffset of data in __LINKEDIT segment: " RESET << "0x"  
     << std::hex << ldc->dataoff << std::endl;
   std::cout << GREEN"\tData size: " RESET << "0x"  << ldc->datasize << std::endl;
+}
+
+void MachFile::parseDataInCode(uint32_t fileoffset, uint32_t datasize)
+{
+  uint32_t numEntries = datasize/sizeof(data_in_code_entry);
+  data_in_code_entry* dce;
+  for (int i = 0; i < numEntries; ++i)
+  {
+    dce = reinterpret_cast<data_in_code_entry*>(machfile + fileoffset + i*sizeof(data_in_code_entry));
+#ifdef VERBOSE
+  printDataInCode(dce);
+#endif
+  }
+}
+
+void MachFile::printDataInCode(data_in_code_entry* dce)
+{
+  std::cout << RED"\t\tOffset from mach_header to start of data range: " RESET << "0x"
+    << std::hex << dce->offset;
+  std::cout << GREEN "\t\tSize: " RESET << "Ox" 
+  << std::hex << dce->length;
+  std::cout << "\t" << toStringDICE(dce->kind) << std::endl;
 }
 
 void MachFile::printDylinkerCommand(dylinker_command* dc)
@@ -335,7 +386,7 @@ void MachFile::printDylinkerCommand(dylinker_command* dc)
 void MachFile::printUUIDCommand(uuid_command* uuid)
 {
   uint8_t* id = uuid->uuid;
-  std::cout << "\tUUID: \n\t\t";
+  std::cout << "\tUUID: ";
   for (int i = 0; i < 16; ++i)
     std::cout << (uint16_t)id[i] << " ";
   
@@ -390,6 +441,8 @@ void MachFile::loadSegmentCommand64()
 
 void MachFile::loadDyldInfoCommand()
 {
+  // dyld_stub_binder is the dynamic linker
+  // pass these offsets to dyld_stub_binder
   dyld_info_command* dic = reinterpret_cast<dyld_info_command*>(machfile + ptr);
   parseDyldInfoCommand(dic);
 #ifdef VERBOSE
@@ -462,13 +515,15 @@ void MachFile::loadDylibCommand()
 #endif
 }
 
+// Specifies the offset and size of a segment which records the location of pieces
+// inlined __TEXT segment data
 void MachFile::loadLinkeditDataCommand()
 {
   linkedit_data_command* ldc = reinterpret_cast<linkedit_data_command*>(machfile + ptr);
-  parseLinkeditDataCommand(ldc);
 #ifdef VERBOSE
   printLinkeditDataCommand(ldc);
 #endif
+    parseLinkeditDataCommand(ldc);
 }
 
 // ---------------------------------------------------------------------------
@@ -496,52 +551,53 @@ void MachFile::parseTwoLevel(uint16_t n_desc)
   if (symbolsInfo.isTwoLevel)
   {
     uint8_t ordinal = GET_LIBRARY_ORDINAL(n_desc);
-    std::cout << "\t\tlibrary ordinal: " << std::dec << (uint16_t)ordinal << " " << toStringREFERENCE(REFERENCE_TYPE & n_desc);
+    std::cout << "\tlibrary ordinal: " << std::dec << (uint16_t)ordinal << "\t" << toStringREFERENCE(REFERENCE_TYPE & n_desc);
   }
   else
   {
-    std::cout << "\t\tdesc: " << toStringREFERENCE(REFERENCE_TYPE & n_desc) << "(0x"  << std::hex << (uint16_t) n_desc << ") ";
+    std::cout << "\tdesc: " << toStringREFERENCE(REFERENCE_TYPE & n_desc) << "(0x"  << std::hex << (uint16_t) n_desc << ") ";
   } 
 }
 
 // ---------------------------------------------------------------------------
 // Symbols
 // ---------------------------------------------------------------------------
+void printNType(uint8_t n_type)
+{
+  if (n_type & N_STAB)
+    std::cout << "\tN_STAB entry (debug): " << toStringSTAB(n_type);
+  if (n_type & N_PEXT)
+    std::cout << "\tN_PEXT ";
+  if (n_type & N_EXT)
+    std::cout << "\tN_EXT ";
+}
 
 // prints an Nlist_64
 void MachFile::printNlist(nlist_64* symEntry)
 {
-    std::string stype = toStringN(N_TYPE & symEntry->n_type);
-    if (N_STAB & symEntry->n_type)
-      std::cout << "\t\t\tN_STAB entry (debug): " << toStringSTAB(symEntry->n_type);
-    else if (N_PEXT & symEntry->n_type)
-      std::cout << "\t\t\tN_PEXT (private extern) " << stype;
-    else if (N_EXT & symEntry->n_type)
-      std::cout << "\t\t\tN_EXT (external symbol) "<< stype;
-    else
-      std::cout << "\t\t\t" << stype;
-    std::cout << " section number: " << std::dec << (uint16_t) symEntry->n_sect;
+    printNType(symEntry->n_type);
+    uint8_t type = symEntry->n_type & N_TYPE;
+    if (type != N_STAB)
+      std::cout << " " << toStringN(type);
+    if (type == N_SECT)
+      std::cout << " section: " << std::dec << (uint16_t) symEntry->n_sect;
     parseTwoLevel(symEntry->n_desc);
-    std::cout << " value:"  << "(0x"  << std::hex << symEntry->n_value << ") " 
-      << toStringN(symEntry->n_value) << std::endl;
+    std::cout << "\t0x"  << std::hex << symEntry->n_value << " ";
 }
 
 void MachFile::printSymEntry(uint32_t symtabIndex)
 {
     nlist_64* symEntry = reinterpret_cast<nlist_64*>(symbolsInfo.symTablePtr + symtabIndex*sizeof(nlist_64));
-    uint32_t strIdx = symEntry->n_un.n_strx; 
-    std::cout << "\t\t" << std::dec << symtabIndex;
-    std::cout << std::dec << "\t\t\t" << strIdx;
-    std::cout <<  "\t\t\t" <<reinterpret_cast<char*>(symbolsInfo.strTablePtr + strIdx);
-#ifdef VERBOSE
     printNlist(symEntry);
-#endif
+    uint32_t strIdx = symEntry->n_un.n_strx; 
+    std::cout << YELLOW"\tsym " RESET<< std::dec << symtabIndex;
+    std::cout << std::dec <<YELLOW "\tstr " RESET << strIdx;
+    std::cout <<  "\t\t" <<reinterpret_cast<char*>(symbolsInfo.strTablePtr + strIdx) << std::endl;
 }
 
 void MachFile::printSymbolTable(uintptr_t symtabStartIdx, uint32_t numEntries)
 {
    nlist_64* symEntry;
-   std::cout << YELLOW "\t\tSymtab Index \t\tStrTab Index\t\tValue " RESET << std::endl;
   for (int i = 0; i < numEntries; ++i)
   {
     printSymEntry(i + symtabStartIdx);
@@ -556,7 +612,6 @@ void MachFile::parseIndirtab(uintptr_t tableStartAddr, uint32_t numEntries)
 void MachFile::printIndirtab()
 {
   uint32_t* indirEntry; // pointer to an index into the sym table
-  std::cout << YELLOW "\t\tSymtab Index \t\tStrTab Index\t\tValue " RESET << std::endl;
   for (int i = 0; i < symbolsInfo.numIndirEntries; ++i)
   {
     indirEntry = reinterpret_cast<uint32_t*>(symbolsInfo.indirSymTable + i*sizeof(uint32_t));

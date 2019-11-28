@@ -57,6 +57,9 @@ void printSection64(section_64* sec64);
 void parseDyldInfoCommand(dyld_info_command* dic); // does nothing
 void printDyldInfoCommand(dyld_info_command* dic);
 
+void disasRebase(uint32_t offset, uint32_t size);
+void disasBind(uint32_t offset, uint32_t size);
+
 void parseSymtabCommand(symtab_command* sc);
 void printSymtabCommand(symtab_command* sc);
 
@@ -71,6 +74,10 @@ void printDylibCommand(dylib_command* dc);
 
 void parseLinkeditDataCommand(linkedit_data_command* ldc); // does nothing
 void printLinkeditDataCommand(linkedit_data_command* ldc);
+
+// fileoffset is offset from the front of the file
+void parseDataInCode(uint32_t dataoffset, uint32_t datasize);
+void printDataInCode(data_in_code_entry* dce);
 
 void printDylinkerCommand(dylinker_command* dc);
 

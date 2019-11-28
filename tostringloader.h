@@ -166,8 +166,6 @@ std::string toStringREBASE(uint64_t s){
           return " REBASE_OPCODE_DO_REBASE_ULEB_TIMES ";
     case REBASE_OPCODE_DO_REBASE_ADD_ADDR_ULEB:
           return " REBASE_OPCODE_DO_REBASE_ADD_ADDR_ULEB ";
-    case REBASE_OPCODE_MASK:
-          return " REBASE_OPCODE_MASK ";
     case REBASE_OPCODE_ADD_ADDR_ULEB:
           return " REBASE_OPCODE_ADD_ADDR_ULEB ";
     case REBASE_OPCODE_DO_REBASE_IMM_TIMES:
@@ -563,8 +561,8 @@ std::string toStringN(uint64_t s){
           return " N_NO_DEAD_STRIP ";
     case N_ARM_THUMB_DEF:
           return " N_ARM_THUMB_DEF ";
-    case N_TYPE:
-          return "N_UNDF ";
+    case N_SECT:
+          return "N_SECT ";
     default:
         return "";
     }
