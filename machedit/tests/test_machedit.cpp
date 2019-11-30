@@ -1,4 +1,3 @@
-#include <sys/stat.h>
 #include "../machedit.h"
 #include "includes/mach_common.h"
 #include "includes/test_common.h"
@@ -89,8 +88,17 @@ int test_write_unchanged_to_file()
   MachEdit machEdit(testFileName);
   const char* newFileName = "newfile";
   machEdit.commit(newFileName);
-  struct stat buf;   
-  return (stat(newFileName, &buf) == 0); 
+  return compareFiles(newFileName, testFileName); 
+}
+
+int test_write_to_file()
+{
+  const char* testFileName = "testVectors/a.out";
+  MachEdit machEdit(testFileName);
+  const char* newFileName = "changedFile";
+  machEdit.writeFile("\ad\xde\ef\xbe", reinterpret_cast<uint8_t*>(machEdit.machFile->machfile) + 69);
+  machEdit.commit(newFileName);
+  return !compareFiles(newFileName, testFileName);
 }
 
 int main()
@@ -102,5 +110,6 @@ int main()
   runTest(test_do_not_write_past_file, "test do not write past end of file");
   runTest(test_edit_file, "test edit file");
   runTest(test_write_unchanged_to_file, "test write unchanged file to new file");
+  runTest(test_write_to_file, "write to file");
   return 0;
 }
