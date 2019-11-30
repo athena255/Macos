@@ -3,19 +3,10 @@
 #include <mach-o/nlist.h>
 #include <mach-o/stab.h>
 
-#define RED     "\x1B[31m" // file offsets
-#define GREEN   "\x1B[32m" // size
-#define YELLOW  "\x1B[33m"  // index
-#define BLUE    "\x1B[34m" // vm addresses
-#define MAGENTA "\x1B[35m" // counts
-#define CYAN    "\x1B[36m"
-#define WHITE   "\x1B[37m"
-#define RESET   "\x1B[00m"
-
 struct BasicInfo {
   uint32_t magic;
   uint32_t numberOfLoadCommands;
-  size_t fileSize;
+  uint64_t fileSize;
   uint32_t entrypointOffset; // entrypoint offset in the file
 };
 
@@ -30,7 +21,7 @@ struct LoaderInfo {
 struct SymbolsInfo {
   uint8_t isTwoLevel; // MH_TWOLEVEL flag of mach_header is set
   uintptr_t symTablePtr; // location of symtable in file
-  size_t numIndirEntries; 
+  uint64_t numIndirEntries; 
   uint32_t indirOffset;
   uintptr_t indirSymTable; // location of indirect symbol table in file
   uintptr_t strTablePtr; // location of string table in file
@@ -117,6 +108,6 @@ LoaderInfo loaderInfo;
 SymbolsInfo symbolsInfo;
 
 char* machfile;
-size_t ptr;
+uintptr_t ptr;
 
 };

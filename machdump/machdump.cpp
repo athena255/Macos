@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include "machdump.h"
+#include "includes/mach_common.h"
 #include "includes/tostringloader.h"
 
 #define DEBUG(x) do { std::cerr << x; } while (0)
@@ -66,7 +67,7 @@ MachFile::MachFile(const char* fileName) : ptr(0)
 
 MachFile::~MachFile() 
 {
-  delete machfile;
+  delete [] machfile;
 }
 
 // ---------------------------------------------------------------------------
