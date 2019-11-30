@@ -2,18 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
-// Find original entrypoint
 
-// Find readable and executable section
-
-// Edit header to change virtual size of the section
-
-// Copy new code to the executable
-
-// Copy push ret instruction to go back to OEP
-
-// MachEdit::MachEdit(const char* fileName) :
-// machFile(new MachFile(fileName))
 MachEdit::MachEdit(const char* fileName):
 machFile(new MachFile(fileName))
 {
@@ -87,4 +76,29 @@ void MachEdit::commit(const char* newfileName)
   std::ofstream newFile (newfileName, std::ios::out | std::ios::binary);
   newFile.write(machFile->machfile, machFile->basicInfo.fileSize);
   newFile.close();
+}
+
+bool MachEdit::redefineEntry(const char* stub)
+{
+
+// Find original entrypoint
+  uintptr_t og_offset = machFile->basicInfo.entrypointOffset;
+
+// Find readable and executable section
+
+// Edit header to change virtual size of the section
+
+// Copy new code to the executable
+            // 0x10000d524      6802000048     push 0x48000002
+            // 0x10000d529      83c420         add esp, 0x20
+            // 0x10000d52c      5d             pop rbp
+            // 0x10000d52d      c3             ret
+
+// Copy push ret instruction to go back to OEP
+  entry_point_command* epc = reinterpret_cast<entry_point_command*>(machFile->loaderInfo.entryPointPtr);
+  // lol how to jump?
+  // push rip
+  // jump rip - sizeof code? 
+
+  // push ret opcodes
 }

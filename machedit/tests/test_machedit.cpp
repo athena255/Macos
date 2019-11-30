@@ -101,6 +101,14 @@ int test_write_to_file()
   return !compareFiles(newFileName, testFileName);
 }
 
+int test_redefine_entry()
+{
+  // find entrypoint
+  const char* testFileName = "testVectors/a.out";
+  MachEdit machEdit(testFileName);
+  
+}
+
 int main()
 {
   runTest(test_init, "test_init");
@@ -111,5 +119,6 @@ int main()
   runTest(test_edit_file, "test edit file");
   runTest(test_write_unchanged_to_file, "test write unchanged file to new file");
   runTest(test_write_to_file, "write to file");
+  runTest(test_redefine_entry, "redefine entrypoint");
   return 0;
 }

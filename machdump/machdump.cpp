@@ -4,9 +4,6 @@
 #include "includes/mach_common.h"
 #include "includes/tostringloader.h"
 
-#define DEBUG(x) do { std::cerr << x; } while (0)
-
-
 void handleError(bool err)
 {
   if (!err)
@@ -313,6 +310,7 @@ void MachFile::printDsymtabCommand(dysymtab_command* dc)
 void MachFile::parseEntrypointCommand(entry_point_command* ep)
 {
   basicInfo.entrypointOffset = ep->entryoff;
+  loaderInfo.entryPointPtr = reinterpret_cast<uintptr_t>(ep);
 }
 
 void MachFile::printEntrypointCommand(entry_point_command* ep)

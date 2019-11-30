@@ -6,3 +6,5 @@
 #define CYAN    "\x1B[36m"
 #define WHITE   "\x1B[37m"
 #define RESET   "\x1B[00m"
+
+#define DEBUG(x) do { std::cerr << x; } while (0)

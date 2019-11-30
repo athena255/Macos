@@ -35,13 +35,15 @@ class MachEdit
   void commit(const char* newfileName);
   MachFile* machFile; 
 
-};
-
 /**
- * 
- * Redefine the entrypoint of a mach-o executable.
+ * @brief Redefine the entrypoint of a mach-o executable.
  * Then jump back to the original entrypoint
+ * @param stub opcodes that we want to execute before calling
+ * original entrypoint. Must be zero terminated. 
+ * @return true if entrypoint successfully redefined, false otherwise
  * 
  */
+  bool redefineEntry(const char* stub);
+};
 
 
