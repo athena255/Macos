@@ -14,6 +14,7 @@ struct LoaderInfo {
   uintptr_t nlSymbolPtr; // pointer to section64 describing __nl_symbol_ptr
   uintptr_t laSymbolPtr; 
   uintptr_t textPtr; // pointer to section64 describing __text
+  uintptr_t textSegPtr; // pointer to the segment containing __text
   uintptr_t dataPtr; 
   uintptr_t linkedItSegPtr; // pointer to __LINKEDIT
   uintptr_t entryPointPtr; // pointer to entrypoint command (LC_MAIN)

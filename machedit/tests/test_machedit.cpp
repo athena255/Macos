@@ -106,7 +106,62 @@ int test_redefine_entry()
   // find entrypoint
   const char* testFileName = "testVectors/a.out";
   MachEdit machEdit(testFileName);
-  
+  section_64* textSec = reinterpret_cast<section_64*>(machEdit.machFile->loaderInfo.textPtr);
+  entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
+  uint64_t oldsize = textSec->size;
+  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
+  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
+  machEdit.redefineEntry("");
+  bool bOk = 1;
+  bOk &= assertEqual(oldsize+5, textSec->size); // should be updated to 5 opcodes forward
+  bOk &= assertEqual(epc->entryoff, fileEditOffset);
+  bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); // don't use char*
+  // e99b39ffff <-- want this instruction
+  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xffff399b);
+  machEdit.commit("redefed");
+  return bOk;
+}
+
+int test_redefine_entry_2()
+{
+  // find entrypoint
+  const char* testFileName = "testVectors/test_heaplib";
+  MachEdit machEdit(testFileName);
+  section_64* textSec = reinterpret_cast<section_64*>(machEdit.machFile->loaderInfo.textPtr);
+  entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
+  uint64_t oldsize = textSec->size;
+  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
+  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
+  machEdit.redefineEntry("");
+  bool bOk = 1;
+  bOk &= assertEqual(oldsize+5, textSec->size); // should be updated to 5 opcodes forward
+  bOk &= assertEqual(epc->entryoff, fileEditOffset);
+  bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); 
+  // e98bfdffff <-- want this instruction
+  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xfffffd8b);
+  machEdit.commit("redefed2");
+  return bOk; 
+}
+
+int test_redefine_entry_hello()
+{
+  // find entrypoint
+  const char* testFileName = "testVectors/hello";
+  MachEdit machEdit(testFileName);
+  section_64* textSec = reinterpret_cast<section_64*>(machEdit.machFile->loaderInfo.textPtr);
+  entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
+  uint64_t oldsize = textSec->size;
+  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
+  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
+  machEdit.redefineEntry("");
+  bool bOk = 1;
+  bOk &= assertEqual(oldsize+5, textSec->size);
+  bOk &= assertEqual(epc->entryoff, fileEditOffset);
+  bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); 
+  // e9cbf2ffff <-- want this instruction
+  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xfffff2cb);
+  machEdit.commit("redefed3");
+  return bOk; 
 }
 
 int main()
@@ -120,5 +175,7 @@ int main()
   runTest(test_write_unchanged_to_file, "test write unchanged file to new file");
   runTest(test_write_to_file, "write to file");
   runTest(test_redefine_entry, "redefine entrypoint");
+  runTest(test_redefine_entry_2, "redefine entry with test_heaplib");
+  runTest(test_redefine_entry_hello, "redefine entry with hello world");
   return 0;
 }

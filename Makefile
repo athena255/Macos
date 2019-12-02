@@ -19,4 +19,4 @@ machedittest: $(MACH_DUMP_DIR)machdump.cpp $(MACH_EDIT_DIR)machedit.cpp $(MACH_E
 
 .PHONY: clean
 clean:
-	rm -f a.out client newfile changedfile
+	rm -f a.out client newfile changedfile redefed*

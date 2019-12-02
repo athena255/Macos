@@ -147,6 +147,10 @@ void MachFile::parseSegmentCommand64(segment_command_64* seg64)
   {
     loaderInfo.linkedItSegPtr = reinterpret_cast<uintptr_t>(seg64);
   }
+  else if ( !strncmp(seg64->segname, "__TEXT", 6))
+  {
+    loaderInfo.textSegPtr = reinterpret_cast<uintptr_t>(seg64);
+  }
 }
 
 void MachFile::printSegmentCommand64(segment_command_64* seg64)
@@ -158,6 +162,8 @@ void MachFile::printSegmentCommand64(segment_command_64* seg64)
   std::cout << RED"\tFile Offset: " RESET << "0x"  << seg64->fileoff << std::endl;
   std::cout << GREEN"\tFile size: " RESET << "0x"  << seg64->filesize << std::endl;
   std::cout << "\tFlags: " RESET << "0x"  << std::hex << seg64->flags << std::endl;
+  std::cout << "\tMax VM protection: " << toStringVM(seg64->maxprot) << std::endl;
+  std::cout << "\tInit VM protection: " << toStringVM(seg64->initprot) << std::endl;
 }
 
 void MachFile::parseSection64(section_64* sec64)

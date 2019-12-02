@@ -239,7 +239,7 @@ std::string toStringEXPORT(uint64_t s){
     case EXPORT_SYMBOL_FLAGS_KIND_ABSOLUTE:
           return " EXPORT_SYMBOL_FLAGS_KIND_ABSOLUTE ";
     default:
-        return "UNKNOWN";
+        return std::to_string(s);
     }
 }
 
@@ -633,7 +633,38 @@ std::string toStringSTAB(uint64_t s){
     case N_ECOMM:
           return " N_ECOMM ";
     default:
-        return "UNKNOWN";
+        return std::to_string(s);
     }
 }
 // found  1
+
+std::string toStringVM(uint64_t s){
+      switch (s){
+      case VM_PROT_NONE:
+            return "VM_PROT_NONE";
+      case VM_PROT_ALL:
+            return "(VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE)";
+      case VM_PROT_DEFAULT:
+            return "(VM_PROT_READ|VM_PROT_WRITE)";
+      case VM_PROT_EXECUTE_ONLY:
+            return "VM_PROT_EXECUTE_ONLY";
+      case VM_PROT_READ:
+            return "VM_PROT_READ";
+      case VM_PROT_WRITE:
+            return "VM_PROT_WRITE";
+      case VM_PROT_EXECUTE:
+            return "VM_PROT_EXECUTE";
+      case VM_PROT_NO_CHANGE:
+            return "VM_PROT_NOCHANGE";
+      case VM_PROT_COPY:
+            return "VM_PROT_COPY";
+      case VM_PROT_IS_MASK:
+            return "VM_PROT_IS_MASK";
+      case VM_PROT_STRIP_READ:
+            return "VM_PROT_STRIP_READ";
+      case VM_PROT_EXECUTE | VM_PROT_READ:
+            return "(VM_PROT_EXECUTE|VM_PROT_READ)";
+      default:
+           return std::to_string(s);
+      }
+}

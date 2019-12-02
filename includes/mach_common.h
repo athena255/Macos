@@ -7,4 +7,9 @@
 #define WHITE   "\x1B[37m"
 #define RESET   "\x1B[00m"
 
+#ifdef DEBUG_EN
 #define DEBUG(x) do { std::cerr << x; } while (0)
+#else
+#define DEBUG(x)
+#endif
+#include <mach/vm_prot.h>

@@ -1,7 +1,10 @@
-#include "machedit.h"
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <string>
+
+#include "machedit.h"
+#include "../includes/mach_common.h"
 
 MachEdit::MachEdit(const char* fileName):
 machFile(new MachFile(fileName))
@@ -13,6 +16,7 @@ MachEdit::~MachEdit()
   delete machFile;
 }
 
+// Slow search but we don't really use this function
 uint8_t* MachEdit::searchSig(const char* signature, uint32_t offset)
 {
 		static auto pattern_to_bytes = [](const char* pattern) 
@@ -78,27 +82,56 @@ void MachEdit::commit(const char* newfileName)
   newFile.close();
 }
 
+// Convert number to little endian
+// Requires that result is size len+1
+void convertToLE(char* result, uint32_t len, uint64_t number)
+{
+  memset(result, 0, len + 1);
+  for (int i = 0; i < 4; ++i)
+  {
+    result[i] = ((number >> sizeof(uintptr_t)*i) & 0xFF);
+  }
+}
+
 bool MachEdit::redefineEntry(const char* stub)
 {
+  segment_command_64* textSeg = reinterpret_cast<segment_command_64*>(machFile->loaderInfo.textSegPtr);
+  section_64* textSec = reinterpret_cast<section_64*>(machFile->loaderInfo.textPtr);
+  uint64_t sizeAvailable = textSeg->vmsize - textSec->size;
+  if (sizeAvailable < 5) // 5 because 32 bit relative jmp instruction is 5 bytes
+    return false;
 
-// Find original entrypoint
-  uintptr_t og_offset = machFile->basicInfo.entrypointOffset;
+  // Write to the first line after the textSection
+  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
 
-// Find readable and executable section
+  // Offset to start of __text + text size + offset to next alignment
+  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
 
-// Edit header to change virtual size of the section
-
-// Copy new code to the executable
-            // 0x10000d524      6802000048     push 0x48000002
-            // 0x10000d529      83c420         add esp, 0x20
-            // 0x10000d52c      5d             pop rbp
-            // 0x10000d52d      c3             ret
-
-// Copy push ret instruction to go back to OEP
+  // Relative jmp to negative of this amount
+  int64_t jmpBackAmt = -(fileEditOffset - machFile->basicInfo.entrypointOffset);
+  DEBUG("jmpBackAmt " << std::hex << -jmpBackAmt << std::endl);
+  char opcodes [5];
+  if (jmpBackAmt <= -0x7f) // use the e9 opcode
+  {
+    // Write the jmp opcode at fileEditOffset
+    uintptr_t fileEditAddr = reinterpret_cast<uintptr_t>(machFile->machfile) + fileEditOffset;
+    *(uintptr_t*)(fileEditAddr) = 0xe9;
+    
+    // Write the relative offset of the jmp: (1<<32) + jmpBackAmt - 5
+    *(uintptr_t*) (fileEditAddr + 1) = jmpBackAmt - 5;
+  }
+  else // use the eb opcode
+  {
+    printf("not yet implemented");
+    return false;
+  }
+  DEBUG("oldsize " << textSec->size << std::endl);
+  // Write the new size in section64 of __text
+  //*(uintptr_t*) ( &textSec->size) = textSec->size + 5;
+  DEBUG("newsize " << textSec->size << std::endl);
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machFile->loaderInfo.entryPointPtr);
-  // lol how to jump?
-  // push rip
-  // jump rip - sizeof code? 
+  // Update entry point segment to point to our opcodes
+  *(uintptr_t*)(&epc->entryoff) = fileEditOffset;
 
-  // push ret opcodes
+  return true;
 }
