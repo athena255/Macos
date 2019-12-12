@@ -132,7 +132,7 @@ int test_redefine_entry_2()
   uint64_t oldsize = textSec->size;
   uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
   uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
-  machEdit.redefineEntry("");
+    machEdit.redefineEntry(0x800);
   bool bOk = 1;
   bOk &= assertEqual(oldsize, textSec->size); // should be updated to 5 opcodes forward
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
@@ -153,7 +153,7 @@ int test_redefine_entry_hello()
   uint64_t oldsize = textSec->size;
   uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
   uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
-  machEdit.redefineEntry(fileEditOffset);
+  machEdit.redefineEntry(0x1005);
   // machEdit.redefineEntry("");
   bool bOk = 1;
   bOk &= assertEqual(oldsize, textSec->size);
