@@ -114,7 +114,8 @@ bool MachEdit::redefineEntry(const char* stub)
   if (jmpBackAmt <= -0x7f) // use the e9 opcode
   {
     // Write the jmp opcode at fileEditOffset
-    uintptr_t fileEditAddr = reinterpret_cast<uintptr_t>(machFile->machfile) + fileEditOffset;
+    uintptr_t fileEditAddr = reinterpret_cast<uintptr_t>(
+        machFile->machfile) + fileEditOffset;
     *(uintptr_t*)(fileEditAddr) = 0xe9;
     
     // Write the relative offset of the jmp: (1<<32) + jmpBackAmt - 5
@@ -129,9 +130,43 @@ bool MachEdit::redefineEntry(const char* stub)
   // Write the new size in section64 of __text
   //*(uintptr_t*) ( &textSec->size) = textSec->size + 5;
   DEBUG("newsize " << textSec->size << std::endl);
-  entry_point_command* epc = reinterpret_cast<entry_point_command*>(machFile->loaderInfo.entryPointPtr);
+  entry_point_command* epc = reinterpret_cast<entry_point_command*>(
+      machFile->loaderInfo.entryPointPtr);
   // Update entry point segment to point to our opcodes
   *(uintptr_t*)(&epc->entryoff) = fileEditOffset;
 
   return true;
 }
+
+bool MachEdit::redefineEntry(uint64_t fileOffset)
+{
+  int64_t jmpBackAmt = -(fileOffset - machFile->basicInfo.entrypointOffset);
+  uintptr_t fileEditAddr = reinterpret_cast<uintptr_t>( machFile->machfile) + fileOffset;
+ 
+  if (jmpBackAmt <= -0x7f)
+  {
+    *(uintptr_t*)(fileEditAddr) = 0xe9;
+    *(uintptr_t*)(fileEditAddr + 1) = jmpBackAmt - 5;
+  }
+  else
+  {
+    *(uintptr_t*)fileEditAddr = 0xeb;
+    *reinterpret_cast<uint8_t*>(fileEditAddr + 1) = (uint8_t)(jmpBackAmt - 2);
+  }
+  
+  entry_point_command* epc = reinterpret_cast<entry_point_command*>(machFile->loaderInfo.entryPointPtr);
+  *(uintptr_t*)(&epc->entryoff) = fileOffset;
+}
+
+
+bool MachEdit::addLC(uintptr_t pLoadCmd, uint32_t cmdSize)
+{
+  // Start at the end of the current commands
+  memcpy(machFile->machfile + machFile->ptr, reinterpret_cast<char*>(pLoadCmd), cmdSize);
+
+  // Edit header
+  mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machFile->machfile);
+  m64->ncmds++;
+  m64->sizeofcmds = machFile->ptr + cmdSize;
+  return false;
+} 

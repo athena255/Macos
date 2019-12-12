@@ -33,7 +33,6 @@ class MachEdit
  * @param newfileName Name of the new file
  */
   void commit(const char* newfileName);
-  MachFile* machFile; 
 
 /**
  * @brief Redefine the entrypoint of a mach-o executable.
@@ -44,6 +43,23 @@ class MachEdit
  * 
  */
   bool redefineEntry(const char* stub);
+
+
+/**
+ * @brief Adds a 5B instruction at fileOffset to jump to the original entry point
+ * Modifies headers and LC commands to start at this entrypoint
+ */
+  bool redefineEntry(uint64_t fileOffset);
+
+
+/**
+ * @brief Adds a load command at the end of the file;
+ */
+  bool addLC(uintptr_t pLoadCmd, uint32_t cmdSize);
+
+
+  MachFile* machFile; 
+
 };
 
 

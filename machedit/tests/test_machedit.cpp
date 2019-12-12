@@ -113,12 +113,12 @@ int test_redefine_entry()
   uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
   machEdit.redefineEntry("");
   bool bOk = 1;
-  bOk &= assertEqual(oldsize+5, textSec->size); // should be updated to 5 opcodes forward
+  bOk &= assertEqual(oldsize, textSec->size); // should be updated to 5 opcodes forward
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
   bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); // don't use char*
   // e99b39ffff <-- want this instruction
   bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xffff399b);
-  machEdit.commit("redefed");
+  machEdit.commit("test_redefine_entry.test");
   return bOk;
 }
 
@@ -134,12 +134,12 @@ int test_redefine_entry_2()
   uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
   machEdit.redefineEntry("");
   bool bOk = 1;
-  bOk &= assertEqual(oldsize+5, textSec->size); // should be updated to 5 opcodes forward
+  bOk &= assertEqual(oldsize, textSec->size); // should be updated to 5 opcodes forward
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
   bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); 
-  // e98bfdffff <-- want this instruction
+  // // e98bfdffff <-- want this instruction
   bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xfffffd8b);
-  machEdit.commit("redefed2");
+  machEdit.commit("test_redefine_entry_2.test");
   return bOk; 
 }
 
@@ -153,19 +153,60 @@ int test_redefine_entry_hello()
   uint64_t oldsize = textSec->size;
   uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
   uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
-  machEdit.redefineEntry("");
+  machEdit.redefineEntry(fileEditOffset);
+  // machEdit.redefineEntry("");
   bool bOk = 1;
-  bOk &= assertEqual(oldsize+5, textSec->size);
+  bOk &= assertEqual(oldsize, textSec->size);
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
   bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); 
   // e9cbf2ffff <-- want this instruction
   bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xfffff2cb);
-  machEdit.commit("redefed3");
+  machEdit.commit("test_redefine_entry_hello.test");
   return bOk; 
+}
+
+int test_add_section()
+{
+  const char* testFileName = "testVectors/hello";
+  MachEdit machEdit(testFileName);
+  linkedit_data_command led;
+  led.dataoff = machEdit.machFile->basicInfo.fileSize;
+  led.datasize = 0x22;
+  led.cmdsize = sizeof(linkedit_data_command);
+  led.cmd = LC_DATA_IN_CODE;
+  machEdit.addLC(reinterpret_cast<uintptr_t>(&led), led.cmdsize);
+  machEdit.commit("test_add_section.test");
+  bool bOk = true;
+  return bOk;
+}
+
+int test_add_seg_cmd()
+{
+  const char* testFileName = "testVectors/hello";
+  MachEdit machEdit(testFileName);
+  segment_command_64 seg64;
+  memset(&seg64, 0, sizeof(segment_command_64));
+  seg64.cmd = LC_SEGMENT_64;
+  memcpy(seg64.segname, "__DURP", 6);
+  seg64.cmdsize = sizeof(segment_command_64);
+  seg64.vmaddr = 0x100002260;
+  seg64.vmsize = 0x100;
+  seg64.fileoff = 8800;
+  seg64.filesize = 0x100;
+  seg64.initprot = VM_PROT_EXECUTE | VM_PROT_READ;
+  seg64.maxprot = VM_PROT_EXECUTE | VM_PROT_READ;
+  seg64.nsects = 0;
+  seg64.flags = 0;
+  machEdit.addLC(reinterpret_cast<uintptr_t>(&seg64), seg64.cmdsize);
+  machEdit.redefineEntry(8800);
+  machEdit.commit("test_add_seg_cmd.test");
+  bool bOk = true;
+  return bOk;
 }
 
 int main()
 {
+#ifdef IGNORE
   runTest(test_init, "test_init");
   runTest(test_search_head_no_wild, "search for magic no wild cards");
   runTest(test_search_head, "search for magic");
@@ -174,8 +215,12 @@ int main()
   runTest(test_edit_file, "test edit file");
   runTest(test_write_unchanged_to_file, "test write unchanged file to new file");
   runTest(test_write_to_file, "write to file");
+#endif
   runTest(test_redefine_entry, "redefine entrypoint");
   runTest(test_redefine_entry_2, "redefine entry with test_heaplib");
   runTest(test_redefine_entry_hello, "redefine entry with hello world");
+  runTest(test_add_section, "add a load command");
+
+  runTest(test_add_seg_cmd, "add a segment command 64");
   return 0;
 }
