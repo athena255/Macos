@@ -126,16 +126,14 @@ bool MachEdit::addLC(uintptr_t pLoadCmd, uint32_t cmdSize)
 void MachEdit::addDylib(const char* dylibPath)
 {
   size_t pathLen = strnlen(dylibPath, 255);
-  struct _mydc {
-    dylib_command dc;
-    char dylibName[255];
-  } mydc;
-  mydc.dc.cmd = LC_LOAD_DYLIB;
-  mydc.dc.cmdsize = sizeof(_mydc);
-  mydc.dc.dylib.name.offset = sizeof(dylib_command);
+  dylib_command dc;
+  memset(&dc, 0, sizeof(dc));
+  dc.cmd = LC_LOAD_DYLIB;
+  dc.cmdsize = sizeof(dc) + pathLen + 8;
+  dc.dylib.name.offset = sizeof(dc);
   // I don't think compatibility version matters...
-  memcpy(mydc.dylibName, dylibPath, pathLen);
-  addLC( reinterpret_cast<uintptr_t>(&mydc), mydc.dc.cmdsize);
+  addLC(reinterpret_cast<uintptr_t>(&dc), dc.cmdsize);
+  memcpy(machFile->machfile + machFile->ptr + sizeof(dc), dylibPath, pathLen);
   machFile->lcVec.push_back(machFile->ptr);
-  machFile->ptr += mydc.dc.cmdsize;
+  machFile->ptr += dc.cmdsize;
 }

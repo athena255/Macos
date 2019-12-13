@@ -248,8 +248,8 @@ int test_add_dylib()
 int test_add_dylib_2()
 {
   MachEdit machEdit("/bin/ls");
-  const char* dylibName = "/Users/athena/macos/testVectors/basicDylib/basic.dylib\0";
-  const char* dylibName2 = "/Users/athena/macos/testVectors/basicDylib/basic2.dylib\0";
+  const char* dylibName = "/Users/athena/macos/testVectors/basicDylib/basic.dylib";
+  const char* dylibName2 = "/Users/athena/macos/testVectors/basicDylib/basic2.dylib";
   machEdit.addDylib(dylibName);
   machEdit.addDylib(dylibName2);
   machEdit.commit("test_add_dylib_2.test");
