@@ -166,26 +166,34 @@ int test_add_section()
 
 int test_add_seg_cmd()
 {
-  const char* testFileName = "testVectors/hello";
+  const char* testFileName = "/bin/ls";
   MachEdit machEdit(testFileName);
-  segment_command_64 seg64;
-  memset(&seg64, 0, sizeof(segment_command_64));
-  seg64.cmd = LC_SEGMENT_64;
-  memcpy(seg64.segname, "__DURP", 6);
-  seg64.cmdsize = sizeof(segment_command_64);
-  seg64.vmaddr = 0x100002260;
-  seg64.vmsize = 0x100;
-  seg64.fileoff = 8800;
-  seg64.filesize = 0x100;
-  seg64.initprot = VM_PROT_EXECUTE | VM_PROT_READ;
-  seg64.maxprot = VM_PROT_EXECUTE | VM_PROT_READ;
-  seg64.nsects = 0;
-  seg64.flags = 0;
-  machEdit.addLC(reinterpret_cast<uintptr_t>(&seg64), seg64.cmdsize);
-  machEdit.redefineEntry(8800);
+  mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
+  // segment_command_64 seg64;
+  // memset(&seg64, 0, sizeof(segment_command_64));
+  // seg64.cmd = LC_SEGMENT_64;
+  // memcpy(seg64.segname, "__TEXT", 6);
+  // seg64.cmdsize = sizeof(segment_command_64);
+  // seg64.vmaddr = 0x100002260;
+  // seg64.vmsize = 0x100;
+  // seg64.fileoff = 8800;
+  // seg64.filesize = 0x100;
+  // seg64.initprot = VM_PROT_EXECUTE | VM_PROT_READ;
+  // seg64.maxprot = VM_PROT_EXECUTE | VM_PROT_READ;
+  // seg64.nsects = 0;
+  // seg64.flags = 0;
+  // machEdit.addLC(reinterpret_cast<uintptr_t>(&seg64), seg64.cmdsize);
+  machEdit.redefineEntry();
   machEdit.commit("test_add_seg_cmd.test");
   bool bOk = true;
   return bOk;
+}
+
+int test_add_dylib()
+{
+  MachEdit machEdit("/bin/ls");
+
+  return 0;
 }
 
 int main()
@@ -199,12 +207,12 @@ int main()
   runTest(test_edit_file, "test edit file");
   runTest(test_write_unchanged_to_file, "test write unchanged file to new file");
   runTest(test_write_to_file, "write to file");
-#endif
   runTest(test_redefine_entry, "redefine entrypoint");
   runTest(test_redefine_entry_2, "redefine entry with test_heaplib");
   runTest(test_redefine_entry_hello, "redefine entry with hello world");
   runTest(test_add_section, "add a load command");
-
+#endif
   runTest(test_add_seg_cmd, "add a segment command 64");
+  runTest(test_add_dylib, "test add dylib");
   return 0;
 }

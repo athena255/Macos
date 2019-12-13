@@ -119,6 +119,6 @@ bool MachEdit::addLC(uintptr_t pLoadCmd, uint32_t cmdSize)
   // Edit header
   mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machFile->machfile);
   m64->ncmds++;
-  m64->sizeofcmds = machFile->ptr + cmdSize;
+  m64->sizeofcmds += cmdSize;
   return false;
 } 

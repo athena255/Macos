@@ -2,6 +2,9 @@
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 #include <mach-o/stab.h>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 struct BasicInfo {
   uint32_t magic;
@@ -111,5 +114,9 @@ SymbolsInfo symbolsInfo;
 
 char* machfile;
 uintptr_t ptr;
+// maps named Segment/Sections to their locations in machFile
+std::unordered_map<std::string, uintptr_t> segSecMap;
+// list of lc commands
+std::vector<uintptr_t> lcVec;
 
 };

@@ -56,6 +56,7 @@ MachFile::MachFile(const char* fileName) : ptr(0)
 #ifdef VERBOSE
     printLC(pLoadCommand, i);
 #endif
+    lcVec.push_back(reinterpret_cast<uintptr_t>(pLoadCommand));
     parseLC(pLoadCommand);
     // Go to the next segment
     ptr += pLoadCommand->cmdsize;
@@ -143,6 +144,7 @@ void MachFile::printLC(load_command* pLoadCommand, uint32_t lcNum)
 
 void MachFile::parseSegmentCommand64(segment_command_64* seg64)
 {
+  segSecMap[seg64->segname] = reinterpret_cast<uintptr_t>(seg64);
   if ( !strncmp(seg64->segname, "__LINKEDIT", 10))
   {
     loaderInfo.linkedItSegPtr = reinterpret_cast<uintptr_t>(seg64);
@@ -168,6 +170,7 @@ void MachFile::printSegmentCommand64(segment_command_64* seg64)
 
 void MachFile::parseSection64(section_64* sec64)
 {
+  segSecMap[sec64->sectname] = reinterpret_cast<uintptr_t>(sec64);
   if ( !strncmp(sec64->sectname, "__text", 6))
   {
     loaderInfo.textPtr = reinterpret_cast<uintptr_t>(sec64);

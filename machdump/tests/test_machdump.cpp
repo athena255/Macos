@@ -48,12 +48,34 @@ void testLib()
     MachFile testLib("/usr/lib/libSystem.B.dylib");
 }
 
+int testSegSecMap()
+{
+    MachFile m("/bin/ls");
+    uint8_t bOk = 1;
+    bOk &= assertEqual(m.segSecMap["__TEXT"], m.loaderInfo.textSegPtr);
+    bOk &= assertEqual(m.segSecMap["__text"], m.loaderInfo.textPtr);
+    bOk &= assertEqual(m.segSecMap["__LINKEDIT"], m.loaderInfo.linkedItSegPtr);
+    return bOk;
+}
+
+int testLCOffsets()
+{
+    MachFile m("/bin/ls");
+    uint8_t bOk = 1;
+    bOk &= assertEqual(m.lcVec[1], m.loaderInfo.textSegPtr);
+    bOk &= assertEqual(m.lcVec[11], m.loaderInfo.entryPointPtr);
+    return bOk;
+}
 
 int main() {
+#ifdef IGNORE
     lazytest();
     runTest(testBasicInfo, "testSymbolsInfo");
     runTest(testSectionInfo, "testSectionInfo");
     runTest(testSymbolsInfo, "testSymbolsInfo");
     runTest(lazytest, "testVectors/a.out");
     testLib(); // should complain
+#endif
+    runTest(testSegSecMap, " segSecMap");
+    runTest(testLCOffsets, "test LC vec");
 }
