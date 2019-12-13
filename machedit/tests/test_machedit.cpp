@@ -124,7 +124,7 @@ int test_redefine_entry_2()
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
   size_t og_entrypoint = epc->entryoff;
   uint64_t fileEditOffset = m64->sizeofcmds + sizeof(mach_header_64) - 8;
-  machEdit.redefineEntry(fileEditOffset);
+  machEdit.redefineEntry(0);
   bool bOk = 1;
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
   bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); 
@@ -140,7 +140,7 @@ int test_redefine_entry_hello()
   size_t og_entrypoint = epc->entryoff;
   mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
   size_t offset = m64->sizeofcmds + sizeof(mach_header_64) - 8;
-  machEdit.redefineEntry(offset);
+  machEdit.redefineEntry();
   bool bOk = 1;
   bOk &= assertEqual(epc->entryoff, offset);
   bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + offset), 0xe9); 

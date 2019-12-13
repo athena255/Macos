@@ -82,35 +82,32 @@ void MachEdit::commit(const char* newfileName)
   newFile.close();
 }
 
-// Convert number to little endian
-// Requires that result is size len+1
-void convertToLE(char* result, uint32_t len, uint64_t number)
+void MachEdit::redefineEntry(uint64_t fileOffset, uint64_t newEntry)
 {
-  memset(result, 0, len + 1);
-  for (int i = 0; i < 4; ++i)
+  if (fileOffset == 0)
   {
-    result[i] = ((number >> sizeof(uintptr_t)*i) & 0xFF);
+    mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machFile->machfile);
+    fileOffset = m64->sizeofcmds + sizeof(mach_header_64) - 8;
   }
-}
+  if (newEntry == 0)
+    newEntry = fileOffset;
 
-bool MachEdit::redefineEntry(uint64_t fileOffset)
-{
   int64_t jmpBackAmt = machFile->basicInfo.entrypointOffset - fileOffset;
   uintptr_t fileEditAddr = reinterpret_cast<uintptr_t>( machFile->machfile) + fileOffset;
  
   if (jmpBackAmt <= -0x7f || jmpBackAmt >= 0x82)
-  {
+  { // write the long jmp opcode (5 bytes)
     *(uintptr_t*)(fileEditAddr) = 0xe9;
     *(uintptr_t*)(fileEditAddr + 1) = jmpBackAmt - 5;
   }
   else
-  {
+  { // write the short jmp opcode (2 bytes)
     *(uintptr_t*)fileEditAddr = 0xeb;
     *reinterpret_cast<uint8_t*>(fileEditAddr + 1) = (uint8_t)(jmpBackAmt - 2);
   }
   
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machFile->loaderInfo.entryPointPtr);
-  *(uintptr_t*)(&epc->entryoff) = fileOffset;
+  *(uintptr_t*)(&epc->entryoff) = newEntry;
 }
 
 

@@ -35,11 +35,15 @@ class MachEdit
   void commit(const char* newfileName);
 
 /**
- * @brief Adds a jmp main opcode at fileOffset and redefines
- * the entrypoint load command
+ * @brief Adds a jmp main (original entrypoint) opcode at fileOffset and redefines
+ * the entrypoint load command to newEntry
+ * @param fileOffset offset in the file to write the jmp main command
+ * default is the area between end of load commands and start of __text
+ * @param newEntry the offset in the file to the new entrypoint
+ * default is fileOffset
  * Modifies headers and LC commands to start at this entrypoint
  */
-  bool redefineEntry(uint64_t fileOffset);
+  void redefineEntry(uint64_t fileOffset=0, uint64_t newEntry=0);
 
 
 /**
