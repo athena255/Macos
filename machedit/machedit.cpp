@@ -93,57 +93,12 @@ void convertToLE(char* result, uint32_t len, uint64_t number)
   }
 }
 
-bool MachEdit::redefineEntry(const char* stub)
-{
-  segment_command_64* textSeg = reinterpret_cast<segment_command_64*>(machFile->loaderInfo.textSegPtr);
-  section_64* textSec = reinterpret_cast<section_64*>(machFile->loaderInfo.textPtr);
-  uint64_t sizeAvailable = textSeg->vmsize - textSec->size;
-  if (sizeAvailable < 5) // 5 because 32 bit relative jmp instruction is 5 bytes
-    return false;
-
-  // Write to the first line after the textSection
-  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
-
-  // Offset to start of __text + text size + offset to next alignment
-  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
-
-  // Relative jmp to negative of this amount
-  int64_t jmpBackAmt = -(fileEditOffset - machFile->basicInfo.entrypointOffset);
-  DEBUG("jmpBackAmt " << std::hex << -jmpBackAmt << std::endl);
-  char opcodes [5];
-  if (jmpBackAmt <= -0x7f) // use the e9 opcode
-  {
-    // Write the jmp opcode at fileEditOffset
-    uintptr_t fileEditAddr = reinterpret_cast<uintptr_t>(
-        machFile->machfile) + fileEditOffset;
-    *(uintptr_t*)(fileEditAddr) = 0xe9;
-    
-    // Write the relative offset of the jmp: (1<<32) + jmpBackAmt - 5
-    *(uintptr_t*) (fileEditAddr + 1) = jmpBackAmt - 5;
-  }
-  else // use the eb opcode
-  {
-    printf("not yet implemented");
-    return false;
-  }
-  DEBUG("oldsize " << textSec->size << std::endl);
-  // Write the new size in section64 of __text
-  //*(uintptr_t*) ( &textSec->size) = textSec->size + 5;
-  DEBUG("newsize " << textSec->size << std::endl);
-  entry_point_command* epc = reinterpret_cast<entry_point_command*>(
-      machFile->loaderInfo.entryPointPtr);
-  // Update entry point segment to point to our opcodes
-  *(uintptr_t*)(&epc->entryoff) = fileEditOffset;
-
-  return true;
-}
-
 bool MachEdit::redefineEntry(uint64_t fileOffset)
 {
-  int64_t jmpBackAmt = -(fileOffset - machFile->basicInfo.entrypointOffset);
+  int64_t jmpBackAmt = machFile->basicInfo.entrypointOffset - fileOffset;
   uintptr_t fileEditAddr = reinterpret_cast<uintptr_t>( machFile->machfile) + fileOffset;
  
-  if (jmpBackAmt <= -0x7f)
+  if (jmpBackAmt <= -0x7f || jmpBackAmt >= 0x82)
   {
     *(uintptr_t*)(fileEditAddr) = 0xe9;
     *(uintptr_t*)(fileEditAddr + 1) = jmpBackAmt - 5;

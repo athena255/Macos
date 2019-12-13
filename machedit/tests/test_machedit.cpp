@@ -103,64 +103,48 @@ int test_write_to_file()
 
 int test_redefine_entry()
 {
-  // find entrypoint
-  const char* testFileName = "testVectors/a.out";
-  MachEdit machEdit(testFileName);
-  section_64* textSec = reinterpret_cast<section_64*>(machEdit.machFile->loaderInfo.textPtr);
+  MachEdit machEdit("testVectors/a.out");
+  mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
-  uint64_t oldsize = textSec->size;
-  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
-  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
-  machEdit.redefineEntry("");
+  size_t og_entrypoint = epc->entryoff;
+  uint64_t fileEditOffset = m64->sizeofcmds + sizeof(mach_header_64);
+  machEdit.redefineEntry(fileEditOffset);
   bool bOk = 1;
-  bOk &= assertEqual(oldsize, textSec->size); // should be updated to 5 opcodes forward
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
-  bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); // don't use char*
-  // e99b39ffff <-- want this instruction
-  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xffff399b);
+  bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9);
+  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), og_entrypoint - fileEditOffset - 5);
   machEdit.commit("test_redefine_entry.test");
   return bOk;
 }
 
 int test_redefine_entry_2()
 {
-  // find entrypoint
-  const char* testFileName = "testVectors/test_heaplib";
-  MachEdit machEdit(testFileName);
-  section_64* textSec = reinterpret_cast<section_64*>(machEdit.machFile->loaderInfo.textPtr);
+  MachEdit machEdit("testVectors/test_heaplib");
+  mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
-  uint64_t oldsize = textSec->size;
-  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
-  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
-    machEdit.redefineEntry(0x800);
+  size_t og_entrypoint = epc->entryoff;
+  uint64_t fileEditOffset = m64->sizeofcmds + sizeof(mach_header_64) - 8;
+  machEdit.redefineEntry(fileEditOffset);
   bool bOk = 1;
-  bOk &= assertEqual(oldsize, textSec->size); // should be updated to 5 opcodes forward
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
   bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); 
-  // // e98bfdffff <-- want this instruction
-  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xfffffd8b);
+  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), og_entrypoint - fileEditOffset - 5);
   machEdit.commit("test_redefine_entry_2.test");
   return bOk; 
 }
 
 int test_redefine_entry_hello()
 {
-  // find entrypoint
-  const char* testFileName = "testVectors/hello";
-  MachEdit machEdit(testFileName);
-  section_64* textSec = reinterpret_cast<section_64*>(machEdit.machFile->loaderInfo.textPtr);
+  MachEdit machEdit("testVectors/hello");
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
-  uint64_t oldsize = textSec->size;
-  uint32_t amtAlign = (1<< textSec->align) - (textSec->size % (1 << textSec->align));
-  uint64_t fileEditOffset = textSec->offset + textSec->size + amtAlign;
-  machEdit.redefineEntry(0x1005);
-  // machEdit.redefineEntry("");
+  size_t og_entrypoint = epc->entryoff;
+  mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
+  size_t offset = m64->sizeofcmds + sizeof(mach_header_64) - 8;
+  machEdit.redefineEntry(offset);
   bool bOk = 1;
-  bOk &= assertEqual(oldsize, textSec->size);
-  bOk &= assertEqual(epc->entryoff, fileEditOffset);
-  bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + fileEditOffset), 0xe9); 
-  // e9cbf2ffff <-- want this instruction
-  bOk &= assertEqual( *reinterpret_cast<uint32_t*>(machEdit.machFile->machfile + fileEditOffset + 1), 0xfffff2cb);
+  bOk &= assertEqual(epc->entryoff, offset);
+  bOk &= assertEqual( *reinterpret_cast<uint8_t*>(machEdit.machFile->machfile + offset), 0xe9); 
+  bOk &= assertEqual( *reinterpret_cast<uintptr_t*>(machEdit.machFile->machfile + offset + 1), og_entrypoint - offset - 5);
   machEdit.commit("test_redefine_entry_hello.test");
   return bOk; 
 }
