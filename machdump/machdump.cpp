@@ -12,15 +12,6 @@ void handleError(bool err)
   exit(EXIT_FAILURE);
 }
 
-// prints X.Y.Z which is encoded in nibbles xxxx.yy.zz
-void parseVersions(uint32_t version)
-{
-    std::cout << std::dec
-    << ((version & 0xFFFF0000) >> 16) << "." 
-    << ((version & 0x0000FF00) >> 8) << "." 
-    << (version & 0xFF);
-}
-
 MachFile::MachFile(const char* fileName) : ptr(0)
 {
   // get the file size

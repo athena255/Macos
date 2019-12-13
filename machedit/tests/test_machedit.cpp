@@ -189,11 +189,71 @@ int test_add_seg_cmd()
   return bOk;
 }
 
+int test_edit_dylib()
+{
+  MachEdit machEdit("/bin/ls");
+  dylib_command* dc = reinterpret_cast<dylib_command*>(machEdit.machFile->lcVec[14]);
+  uintptr_t libPathAddr = machEdit.machFile->lcVec[14] + dc->dylib.name.offset;
+  memcpy((char*)libPathAddr, "/Users/athena/macos/basic.dylib\0", 33);
+  machEdit.commit("test_edit_dylib.test");
+  return 1;
+}
+
+int test_version()
+{
+  const char* version = "1.2.3";
+  uint32_t u32 = unparseVersion(version);
+  parseVersions(u32);
+
+  const char* version2 = "93.12.127";
+  u32 = unparseVersion(version2);
+  parseVersions(u32);
+  return 1;
+}
+
+int test_add_same_dylib()
+{
+  MachEdit machEdit("/bin/ls");
+  dylib_command* dc = reinterpret_cast<dylib_command*>(machEdit.machFile->lcVec[13]);
+  uintptr_t libPathAddr = machEdit.machFile->lcVec[13] + dc->dylib.name.offset;
+  // dylib_command newdc;
+  // memset((char*)&newdc, 0, sizeof(dylib_command));
+  // memcpy((char*)&newdc, dc, sizeof(&dc));
+  machEdit.addLC(reinterpret_cast<uintptr_t>(dc), dc->cmdsize);
+  memcpy(machEdit.machFile->machfile + machEdit.machFile->ptr + dc->dylib.name.offset, (char*)libPathAddr, strlen((char*)libPathAddr));
+  machEdit.commit("test_add_same_dylib.test");
+  return 1;
+}
+
 int test_add_dylib()
 {
   MachEdit machEdit("/bin/ls");
+  const char* dylibName = "/Users/athena/macos/testVectors/basicDylib/basic.dylib\0";
+  struct _mydc{
+    dylib_command dc;
+    char dylibName[56];
+  } mydc;
+  mydc.dc.cmd = LC_LOAD_DYLIB;
+  mydc.dc.cmdsize = sizeof(_mydc);
+  mydc.dc.dylib.name.offset = sizeof(dylib_command);
+  // I don't think compatibility version matters...
+  mydc.dc.dylib.current_version = unparseVersion("1.6.0");
+  mydc.dc.dylib.compatibility_version = unparseVersion("2.0.0");
+  memcpy(mydc.dylibName, dylibName, 56);
+  machEdit.addLC( reinterpret_cast<uintptr_t>(&mydc), mydc.dc.cmdsize);
+  machEdit.commit("test_add_dylib.test");
+  return 1;
+}
 
-  return 0;
+int test_add_dylib_2()
+{
+  MachEdit machEdit("/bin/ls");
+  const char* dylibName = "/Users/athena/macos/testVectors/basicDylib/basic.dylib\0";
+  const char* dylibName2 = "/Users/athena/macos/testVectors/basicDylib/basic2.dylib\0";
+  machEdit.addDylib(dylibName);
+  machEdit.addDylib(dylibName2);
+  machEdit.commit("test_add_dylib_2.test");
+  return 1;
 }
 
 int main()
@@ -211,8 +271,12 @@ int main()
   runTest(test_redefine_entry_2, "redefine entry with test_heaplib");
   runTest(test_redefine_entry_hello, "redefine entry with hello world");
   runTest(test_add_section, "add a load command");
-#endif
   runTest(test_add_seg_cmd, "add a segment command 64");
+  runTest(test_edit_dylib, "test edit dylib");
+  runTest(test_version, "test versions");
+  #endif
+  runTest(test_add_same_dylib, "add same dylib");
   runTest(test_add_dylib, "test add dylib");
+  runTest(test_add_dylib_2, "test add dylib 2");
   return 0;
 }

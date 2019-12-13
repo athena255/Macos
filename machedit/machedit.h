@@ -45,15 +45,18 @@ class MachEdit
  */
   void redefineEntry(uint64_t fileOffset=0, uint64_t newEntry=0);
 
-
 /**
  * @brief Adds a load command at the end of the file;
  */
   bool addLC(uintptr_t pLoadCmd, uint32_t cmdSize);
 
+  /**
+   * @brief Adds a dylibPath to the list of headers
+   * (does not check the end of headers)
+   * Note: max path length is 255
+   */
+  void addDylib(const char* dylibPath);
 
   MachFile* machFile; 
 
 };
-
-
