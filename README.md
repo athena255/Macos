@@ -1,5 +1,7 @@
 Analyzes a Mach-O file and pretty-prints load commands, segments, sections, etc. 
 
+machedit project also modifies Mach-O files. 
+
 To build:
 
     make 

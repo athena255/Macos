@@ -118,5 +118,6 @@ uintptr_t ptr;
 std::unordered_map<std::string, uintptr_t> segSecMap;
 // list of lc commands
 std::vector<uintptr_t> lcVec;
-
+// pointer to the machHeader
+mach_header_64* pMachHeader;
 };

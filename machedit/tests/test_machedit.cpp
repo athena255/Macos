@@ -53,12 +53,13 @@ int test_do_not_write_past_file()
 {
   const char* testFileName = "testVectors/a.out";
   MachEdit machEdit(testFileName);
-  uint64_t fileLen = machEdit.machFile->basicInfo.fileSize;
+  size_t fileLen = machEdit.machFile->basicInfo.fileSize;
+  char* write_addr = machEdit.machFile->machfile + fileLen - 8;
   char oldData [0x10];
   memset(oldData, 0, 0x10);
-  memcpy(oldData, machEdit.machFile->machfile+fileLen - 8, 8);
-  machEdit.writeFile("blah blah", reinterpret_cast<uint8_t*>(machEdit.machFile->machfile) + fileLen - 4);
-  int res = strncmp(oldData, machEdit.machFile->machfile+fileLen - 8, 8);
+  memcpy(oldData, write_addr, 8);
+  machEdit.writeFile("blah blah", fileLen - 4, 10);
+  int res = strncmp(oldData,write_addr, 8);
  return assertEqual(res, 0);
 }
 
@@ -77,7 +78,7 @@ int test_edit_file()
   for (uint8_t i = 0; i < 0x10; ++i)
     newData[i] = oldData[i] + 1;
 
-  machEdit.writeFile(newData, reinterpret_cast<uint8_t*> (machEdit.machFile->machfile) + offset);
+  machEdit.writeFile(newData, offset, 0x10);
   int res = strncmp(oldData, machEdit.machFile->machfile + offset, 0x10);
  return res != 0;
 }
@@ -96,7 +97,7 @@ int test_write_to_file()
   const char* testFileName = "testVectors/a.out";
   MachEdit machEdit(testFileName);
   const char* newFileName = "changedFile";
-  machEdit.writeFile("\ad\xde\ef\xbe", reinterpret_cast<uint8_t*>(machEdit.machFile->machfile) + 69);
+  machEdit.writeFile("\ad\xde\ef\xbe", 69, 4);
   machEdit.commit(newFileName);
   return !compareFiles(newFileName, testFileName);
 }
@@ -123,7 +124,7 @@ int test_redefine_entry_2()
   mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
   size_t og_entrypoint = epc->entryoff;
-  uint64_t fileEditOffset = m64->sizeofcmds + sizeof(mach_header_64) - 8;
+  uint64_t fileEditOffset = m64->sizeofcmds + sizeof(mach_header_64);
   machEdit.redefineEntry(0);
   bool bOk = 1;
   bOk &= assertEqual(epc->entryoff, fileEditOffset);
@@ -139,7 +140,7 @@ int test_redefine_entry_hello()
   entry_point_command* epc = reinterpret_cast<entry_point_command*>(machEdit.machFile->loaderInfo.entryPointPtr);
   size_t og_entrypoint = epc->entryoff;
   mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
-  size_t offset = m64->sizeofcmds + sizeof(mach_header_64) - 8;
+  size_t offset = m64->sizeofcmds + sizeof(mach_header_64);
   machEdit.redefineEntry();
   bool bOk = 1;
   bOk &= assertEqual(epc->entryoff, offset);
@@ -169,20 +170,20 @@ int test_add_seg_cmd()
   const char* testFileName = "/bin/ls";
   MachEdit machEdit(testFileName);
   mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machEdit.machFile->machfile);
-  // segment_command_64 seg64;
-  // memset(&seg64, 0, sizeof(segment_command_64));
-  // seg64.cmd = LC_SEGMENT_64;
-  // memcpy(seg64.segname, "__TEXT", 6);
-  // seg64.cmdsize = sizeof(segment_command_64);
-  // seg64.vmaddr = 0x100002260;
-  // seg64.vmsize = 0x100;
-  // seg64.fileoff = 8800;
-  // seg64.filesize = 0x100;
-  // seg64.initprot = VM_PROT_EXECUTE | VM_PROT_READ;
-  // seg64.maxprot = VM_PROT_EXECUTE | VM_PROT_READ;
-  // seg64.nsects = 0;
-  // seg64.flags = 0;
-  // machEdit.addLC(reinterpret_cast<uintptr_t>(&seg64), seg64.cmdsize);
+  segment_command_64 seg64;
+  memset(&seg64, 0, sizeof(segment_command_64));
+  seg64.cmd = LC_SEGMENT_64;
+  memcpy(seg64.segname, "__TEXT", 6);
+  seg64.cmdsize = sizeof(segment_command_64);
+  seg64.vmaddr = 0x100002260;
+  seg64.vmsize = 0x100;
+  seg64.fileoff = 8800;
+  seg64.filesize = 0x100;
+  seg64.initprot = VM_PROT_EXECUTE | VM_PROT_READ;
+  seg64.maxprot = VM_PROT_EXECUTE | VM_PROT_READ;
+  seg64.nsects = 0;
+  seg64.flags = 0;
+  machEdit.addLC(reinterpret_cast<uintptr_t>(&seg64), seg64.cmdsize);
   machEdit.redefineEntry();
   machEdit.commit("test_add_seg_cmd.test");
   bool bOk = true;
@@ -216,9 +217,6 @@ int test_add_same_dylib()
   MachEdit machEdit("/bin/ls");
   dylib_command* dc = reinterpret_cast<dylib_command*>(machEdit.machFile->lcVec[13]);
   uintptr_t libPathAddr = machEdit.machFile->lcVec[13] + dc->dylib.name.offset;
-  // dylib_command newdc;
-  // memset((char*)&newdc, 0, sizeof(dylib_command));
-  // memcpy((char*)&newdc, dc, sizeof(&dc));
   machEdit.addLC(reinterpret_cast<uintptr_t>(dc), dc->cmdsize);
   memcpy(machEdit.machFile->machfile + machEdit.machFile->ptr + dc->dylib.name.offset, (char*)libPathAddr, strlen((char*)libPathAddr));
   machEdit.commit("test_add_same_dylib.test");
@@ -249,12 +247,70 @@ int test_add_dylib_2()
 {
   MachEdit machEdit("/bin/ls");
   const char* dylibName = "/Users/athena/macos/testVectors/basicDylib/basic.dylib";
-  const char* dylibName2 = "/Users/athena/macos/testVectors/basicDylib/basic2.dylib";
+  // const char* dylibName2 = "/Users/athena/macos/testVectors/basicDylib/basic2.dylib";
   machEdit.addDylib(dylibName);
-  machEdit.addDylib(dylibName2);
+  // machEdit.addDylib(dylibName2);
   machEdit.commit("test_add_dylib_2.test");
   return 1;
 }
+
+int test_change_current_version()
+{
+  MachEdit m("/bin/cat");
+  dylib_command* dc = reinterpret_cast<dylib_command*>(m.machFile->lcVec[12]);
+  dc->dylib.current_version = unparseVersion("1.0.0");
+  dc->dylib.compatibility_version = unparseVersion("10.2.2");
+  m.commit("test_change_version.test");
+  // seems like it still works
+  return 1;
+}
+
+int test_change_dylinker()
+{
+  MachEdit m("/bin/cat");
+  dylinker_command* dc = reinterpret_cast<dylinker_command*>(m.machFile->lcVec[7]);
+  uintptr_t nameAddr = reinterpret_cast<uintptr_t>(dc) + dc->name.offset;
+  memset((void*)nameAddr, 0, 14);
+  memcpy((void*)nameAddr, "/tmp/dyld", 9);
+  m.commit("test_change_dylinker.test");
+  return 1;
+}
+int test_replace_and_load()
+{
+  MachEdit m("testVectors/test_heaplib");
+  // m.addDylib("testVectors/basicDylib/basic.dylib\0");
+  // load_command* lc = reinterpret_cast<load_command*>(m.machFile->lcVec[11]);
+  // dylib_command* dc = reinterpret_cast<dylib_command*>(m.machFile->lcVec[12]);
+  // lc->cmdsize += dc->cmdsize;
+  // memset(dc, 0, dc->cmdsize);
+  // mach_header_64* mh = reinterpret_cast<mach_header_64*>(m.machFile->machfile);
+  // mh->ncmds--;
+  // fix the ordinals
+  m.replaceOrdinal(1, 7, 6);
+  m.commit("test_replace_and_load.test");
+  return 1;
+}
+
+int test_segfault()
+{
+  MachEdit m("/bin/ls");
+  m.addDylib("testVectors/basicDylib/basic.dylib\0");
+  dyld_info_command* dic = reinterpret_cast<dyld_info_command*>(m.machFile->lcVec[4]);
+  m.replaceOrdinal(3, -1, 6);
+  // dic->rebase_off = dic->bind_off;
+  // dic->bind_off = 0x64;
+  m.commit("test_segfault.test");
+  return 1;
+}
+
+
+int test_extendlc()
+{
+  MachEdit m("/bin/ls");
+  m.extendLC(2, 32);
+  m.commit("test_extend_lc.test");
+}
+
 
 int main()
 {
@@ -274,9 +330,14 @@ int main()
   runTest(test_add_seg_cmd, "add a segment command 64");
   runTest(test_edit_dylib, "test edit dylib");
   runTest(test_version, "test versions");
-  #endif
   runTest(test_add_same_dylib, "add same dylib");
   runTest(test_add_dylib, "test add dylib");
   runTest(test_add_dylib_2, "test add dylib 2");
+  runTest(test_change_current_version, "test change current version");
+  runTest(test_change_dylinker, "test change dylinker");
+  runTest(test_replace_and_load, "replace and load");
+  runTest(test_segfault, "test seg fault");
+#endif
+  runTest(test_extendlc, "test shifting loadcommands down");
   return 0;
 }

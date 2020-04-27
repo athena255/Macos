@@ -3,7 +3,8 @@ TEST_DIR = tests/
 MACH_DUMP_DIR = machdump/
 MACH_LOAD_DIR = machload/
 MACH_EDIT_DIR = machedit/
-CFLAGS = -std=c++14 -I.
+MAC_FNMAP_DIR = machFnMap/
+CFLAGS = -std=c++14 -I. -glldb
 
 mach: $(MACH_DUMP_DIR)machdump.cpp client.cpp
 	$(CXX) -DVERBOSE -o client $(MACH_DUMP_DIR)machdump.cpp client.cpp $(CFLAGS)
@@ -16,6 +17,9 @@ machloadertest: machdump.cpp machloader.cpp $(TEST_DIR)test_machloader.cpp
 
 machedittest: $(MACH_DUMP_DIR)machdump.cpp $(MACH_EDIT_DIR)machedit.cpp $(MACH_EDIT_DIR)$(TEST_DIR)test_machedit.cpp
 	$(CXX) -o a.out $(MACH_DUMP_DIR)machdump.cpp $(MACH_EDIT_DIR)machedit.cpp $(MACH_EDIT_DIR)$(TEST_DIR)test_machedit.cpp $(CFLAGS)
+
+machfnmaptest: machFnMap/machfnmap.cpp  machFnMap/tests/test_machfnmap.cpp
+	$(CXX) -o a.out machFnMap/machfnmap.cpp machFnMap/tests/test_machfnmap.cpp $(CFLAGS)
 
 basicdylib: testVectors/basicDylib/basicdylib.cpp testVectors/basicDylib/basicdylib2.cpp
 	# $(CXX) -dynamiclib testVectors/basicDylib/basicdylib.cpp -install_name -o basic.dylib 

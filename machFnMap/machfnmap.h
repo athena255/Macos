@@ -2,7 +2,7 @@
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 #include <mach-o/stab.h>
-#include <map>
+#include <vector>
 
 /**
  * An interface that maps function pointers to load_commands, segments, or sections.
@@ -10,22 +10,19 @@
  * element
  */
 
-using PARAM = void*;
-using FN = void (*)(void*, void*);
-using LC = uint32_t;
-
 template <typename T>
 class Functor
 {
   private:
     T* me;
-    FN fn;
   public:
-    Functor(T* thing, FN fn)
-    T* operator()(T* thing) const {
-      fn(thing);
+    explicit Functor(T*);
+    
+    T* operator()(size_t idx) const {
+      
     }
 
+  friend class MachFnMap;
 };
 
 class MachFnMap
@@ -33,15 +30,6 @@ class MachFnMap
   public:
   MachFnMap(const char* fileName);
   ~MachFnMap();
-
-/**
- * @brief registers the specified function and parameter with the load command
- * specified by cmd
- * @param fn function
- * @param param optional paramter to the function
- * @param cmd LC_COMMAND identifier
- */
-  void bind(LC, FN, PARAM);
 
   /**
    * @brief iterates through the given file and executes the registered functions
@@ -53,8 +41,8 @@ class MachFnMap
 
   private:
 
-  // map a LC_COMMAND : <function, param>
-  std::map<LC, FN> fnMap;
+  mach_header* pMachHeader;
+  std::vector<load_command*> lcVec;
 
   // working copy of machfile
   char* filedata;

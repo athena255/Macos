@@ -26,7 +26,8 @@ class MachEdit
  * @param data Null terminated string of bytes i.e. "\xad\xde"
  * @param offset File offset at which to write the edit 
  */
-  void writeFile(const char* data, uint8_t* fileOffset);
+bool writeFile(const char* data, uintptr_t fileOffset, size_t dataLen);
+
 
 /**
  * @brief Commit changes and save them to fileName
@@ -50,12 +51,27 @@ class MachEdit
  */
   bool addLC(uintptr_t pLoadCmd, uint32_t cmdSize);
 
+  void replaceOrdinal(uint32_t oldOrdinal, uint32_t newOrdinal, size_t dsymIndex);
+
   /**
    * @brief Adds a dylibPath to the list of headers
    * (does not check the end of headers)
    * Note: max path length is 255
    */
   void addDylib(const char* dylibPath);
+
+  /**
+   * @brief Extend the size of the load command at lcIndex by shifting
+   * everyone after it down
+   */
+  void extendLC(size_t lcIndex, size_t amt);
+
+
+/**
+ * @brief Changes the file to cause it to execute exePathName and then
+ * jump to original entrypoint
+ */
+  void embedBin(char const* exePathName);
 
   MachFile* machFile; 
 

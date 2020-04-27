@@ -17,14 +17,33 @@ MachFnMap::MachFnMap(const char* fileName)
         exit(1);
     fs.close();
 
-    mach_header* pMachHeader = reinterpret_cast<mach_header*>(filedata);
+    pMachHeader = reinterpret_cast<mach_header*>(filedata);
     size_t ncmds = pMachHeader->ncmds;
+
+    load_command* pLoadCommand;
+    uintptr_t offset = sizeof(mach_header_64);
+    for (size_t i = 0; i < ncmds; ++i)
+    {
+        pLoadCommand = reinterpret_cast<load_command*>(filedata+offset);
+        lcVec.push_back(pLoadCommand);
+    }
 }
 
-void MachFnMap::bind(LC cmd, FN pFn, PARAM pParam)
+MachFnMap::~MachFnMap()
 {
 
 }
+
+// Shift all the load commands down [amt]
+void shift_down(load_command* lc, size_t amt)
+{
+    size_t cmdSize = lc->cmdsize;
+    uint8_t* tmp = new uint8_t[cmdSize];
+    memcpy(tmp, (void*)lc, cmdSize);
+    memcpy(reinterpret_cast<uint8_t*>(lc)+amt, tmp, cmdSize);
+    delete [] tmp;
+}
+
 
 void MachFnMap::execute()
 {
@@ -34,9 +53,7 @@ void MachFnMap::execute()
 }
 
 template <typename T>
-Functor<T>::Functor(T* thing, FN fn) :
-me(thing),
-fn(fn)
+Functor<T>::Functor(T* thing) :
+me(thing)
 {
-
 }

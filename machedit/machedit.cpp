@@ -64,15 +64,14 @@ uint8_t* MachEdit::searchSig(const char* signature, uint32_t offset)
     return nullptr;
 }
 
-void MachEdit::writeFile(const char* data, uint8_t* fileOffset)
+bool MachEdit::writeFile(const char* data, uintptr_t fileOffset, size_t dataLen)
 {
-  uint64_t fileLen = machFile->basicInfo.fileSize; 
-  uint64_t dataLen = strlen(data);
+  size_t fileLen = machFile->basicInfo.fileSize; 
   // Do not write past the end of the file
-  if (fileOffset + dataLen > reinterpret_cast<uint8_t*>(machFile->machfile) + fileLen)
-    return;
-  
-  memcpy(fileOffset, data, strlen(data));
+  if (fileOffset + dataLen > fileLen)
+    return false;
+  memcpy(machFile->machfile + fileOffset, data, dataLen);
+  return true;
 }
 
 void MachEdit::commit(const char* newfileName)
@@ -114,14 +113,36 @@ void MachEdit::redefineEntry(uint64_t fileOffset, uint64_t newEntry)
 bool MachEdit::addLC(uintptr_t pLoadCmd, uint32_t cmdSize)
 {
   // Start at the end of the current commands
-  memcpy(machFile->machfile + machFile->ptr, reinterpret_cast<char*>(pLoadCmd), cmdSize);
-
+  writeFile(reinterpret_cast<char*>(pLoadCmd), machFile->ptr, cmdSize);
   // Edit header
   mach_header_64* m64 = reinterpret_cast<mach_header_64*>(machFile->machfile);
   m64->ncmds++;
   m64->sizeofcmds += cmdSize;
   return false;
 } 
+
+void replaceOrdinalHelp(MachEdit* m, uint32_t oldOrdinal, uint32_t newOrdinal, uintptr_t startIndex, size_t numSyms)
+{
+  uint32_t symIndex;
+  nlist_64* symEntry;
+  uint16_t ordinal;
+  for (int i = 0; i < numSyms; ++i)
+  {
+    symIndex = i + startIndex;
+    symEntry = reinterpret_cast<nlist_64*>(m->machFile->symbolsInfo.symTablePtr + symIndex*sizeof(nlist_64));
+    ordinal = GET_LIBRARY_ORDINAL(symEntry->n_desc);
+    if (ordinal == oldOrdinal)
+      SET_LIBRARY_ORDINAL(symEntry->n_desc, newOrdinal);
+  }
+}
+
+void MachEdit::replaceOrdinal(uint32_t oldOrdinal, uint32_t newOrdinal, size_t dsymIndex)
+{
+
+  dysymtab_command* dc = reinterpret_cast<dysymtab_command*>(machFile->lcVec[dsymIndex]);
+  replaceOrdinalHelp(this, oldOrdinal, newOrdinal, dc->iundefsym, dc->nundefsym);
+
+}
 
 void MachEdit::addDylib(const char* dylibPath)
 {
@@ -133,7 +154,85 @@ void MachEdit::addDylib(const char* dylibPath)
   dc.dylib.name.offset = sizeof(dc);
   // I don't think compatibility version matters...
   addLC(reinterpret_cast<uintptr_t>(&dc), dc.cmdsize);
-  memcpy(machFile->machfile + machFile->ptr + sizeof(dc), dylibPath, pathLen);
+  writeFile(dylibPath, machFile->ptr + sizeof(dc), pathLen+1);
   machFile->lcVec.push_back(machFile->ptr);
   machFile->ptr += dc.cmdsize;
+}
+
+void shiftSection64(uintptr_t lc, size_t amt){
+  section_64* s = reinterpret_cast<section_64*>(lc);
+  s->addr += amt;
+  s->offset += amt;
+}
+
+void shiftSegment64(uintptr_t lc, size_t amt){
+  segment_command_64* sc = reinterpret_cast<segment_command_64*>(lc);
+  sc->fileoff += amt;
+  for (size_t i = 0; i < sc->nsects; ++i){
+    shiftSection64(
+      lc + sizeof(segment_command_64) + i*sizeof(section_64),
+      amt
+    );
+  }
+}
+
+void fixSegmentCommands(uintptr_t lc, size_t amt)
+{
+  switch(reinterpret_cast<load_command*>(lc)->cmd)
+  {
+    case LC_SEGMENT_64:
+      shiftSegment64(lc, amt);
+      break;
+    default:
+      break;
+  }
+}
+
+uintptr_t shiftDown(uintptr_t lc, size_t amt)
+{
+  
+  size_t cmdsize = reinterpret_cast<load_command*>(lc)->cmdsize;
+  uint8_t* tmp = new uint8_t[cmdsize];
+  memcpy(tmp, (void*)lc, cmdsize);
+  // Copy tmp back to lc but at an offset
+  memcpy((void*)(lc + amt), tmp, cmdsize);
+  fixSegmentCommands(lc+amt, amt);
+  return lc + amt;
+}
+
+void extendSegment64(segment_command_64* sc, size_t amt)
+{
+  sc->filesize += amt;
+}
+
+
+void MachEdit::extendLC(size_t lcIndex, size_t amt)
+{
+  if (lcIndex >= machFile->pMachHeader->ncmds)
+    return;
+  machFile->basicInfo.fileSize += amt;
+  load_command* pFirstLC = reinterpret_cast<load_command*>(machFile->lcVec[lcIndex]);
+  
+  // adjust lc cmdsize
+  pFirstLC->cmdsize += amt;
+
+  if (pFirstLC->cmd == LC_SEGMENT_64)
+    extendSegment64(reinterpret_cast<segment_command_64*>(pFirstLC), amt);
+  
+  // TODO: handle case where current file buffer is not large enough
+  // iterate
+  for (size_t i = machFile->pMachHeader->ncmds - 1; i > lcIndex; --i)
+  {
+    shiftDown(machFile->lcVec[i], amt);
+    machFile->lcVec[i] += amt; // shift these pointers
+  }
+  // Fix headers
+  machFile->pMachHeader->sizeofcmds += amt;
+
+}
+
+void MachEdit::embedBin(char const *exePathName)
+{
+  // Idea: Copy contents of file into the end of the file
+  // Write shellcode to load that into a temporary file
 }

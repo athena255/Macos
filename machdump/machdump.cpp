@@ -22,12 +22,12 @@ MachFile::MachFile(const char* fileName) : ptr(0)
   fs.seekg(0, std::ios::beg);
 
   // read file into local buffer
-  machfile = new char[basicInfo.fileSize];
+  machfile = new char[basicInfo.fileSize + 0x2048]; // TODO: make this less jank
   fs.read(machfile, basicInfo.fileSize);
   handleError(fs.fail());
   fs.close();
   
-  mach_header_64* pMachHeader = reinterpret_cast<mach_header_64*>(machfile);
+  pMachHeader = reinterpret_cast<mach_header_64*>(machfile);
 #ifdef VERBOSE
   printHeader(pMachHeader);
 #endif
@@ -596,7 +596,6 @@ void MachFile::printSymEntry(uint32_t symtabIndex)
 
 void MachFile::printSymbolTable(uintptr_t symtabStartIdx, uint32_t numEntries)
 {
-   nlist_64* symEntry;
   for (int i = 0; i < numEntries; ++i)
   {
     printSymEntry(i + symtabStartIdx);
